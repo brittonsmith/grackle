@@ -23,6 +23,7 @@ from .utilities.convenience import \
 
 from .utilities.evolve import \
     evolve_constant_density, \
+    evolve_constant_pressure, \
     evolve_freefall
 
 from .utilities.units import \

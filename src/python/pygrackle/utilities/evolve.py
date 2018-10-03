@@ -180,3 +180,82 @@ def evolve_constant_density(fc, final_temperature=None,
         else:
             data[field] = np.array(data[field])
     return data
+
+def evolve_constant_pressure(fc, final_temperature=None,
+                            final_time=None, safety_factor=0.01):
+    my_chemistry = fc.chemistry_data
+
+    if final_temperature is None and final_time is None:
+        raise RuntimeError("Must specify either final_temperature " +
+                           "or final_time.")
+
+    data = defaultdict(list)
+    current_time = 0.0
+    fc.calculate_cooling_time()
+    dt = safety_factor * np.abs(fc["cooling_time"][0])
+    fc.calculate_temperature()
+    fc.calculate_pressure()
+    initial_density = fc["density"][0]
+    initial_pressure = fc["pressure"][0]
+    current_temperature = fc["temperature"][0]
+
+    while True:
+        if final_temperature is not None and fc["temperature"][0] <= final_temperature:
+            break
+        if final_time is not None and current_time >= final_time:
+            break
+
+        fc.calculate_temperature()
+        print("Evolve constant density - t: %e yr, rho: %e g/cm^3, T: %e K." %
+              (current_time * my_chemistry.time_units / sec_per_year,
+               fc["density"][0] * my_chemistry.density_units,
+               fc["temperature"][0]))
+        fc.solve_chemistry(dt)
+
+        for field in fc.density_fields:
+            data[field].append(fc[field][0] * my_chemistry.density_units)
+        data["energy"].append(fc["energy"][0])
+        fc.calculate_temperature()
+        data["temperature"].append(fc["temperature"][0])
+        t_ratio = current_temperature / fc["temperature"][0]
+
+        fc["density"][:] *= t_ratio
+        if my_chemistry.primordial_chemistry > 0:
+            fc["HII"][:] *= t_ratio
+            fc["HI"][:] *= t_ratio
+            fc["HeI"][:] *= t_ratio
+            fc["HeII"][:] *= t_ratio
+            fc["HeIII"][:] *= t_ratio
+            fc["de"][:] *= t_ratio
+        if my_chemistry.primordial_chemistry > 1:
+            fc["HM"][:] *= t_ratio
+            fc["H2I"][:] *= t_ratio
+            fc["H2II"][:] *= t_ratio
+        if my_chemistry.primordial_chemistry > 2:
+            fc["DI"][:] *= t_ratio
+            fc["DII"][:] *= t_ratio
+            fc["HDI"][:] *= t_ratio
+        fc["metal"][:] *= t_ratio
+        
+        fc.calculate_pressure()
+        data["pressure"].append(fc["pressure"][0])
+        data["time"].append(current_time * my_chemistry.time_units)
+
+        current_temperature = fc["temperature"][0]
+        
+        current_time += dt
+
+    for field in data:
+        if field in fc.density_fields:
+            data[field] = yt.YTArray(data[field], "g/cm**3")
+        elif field == "energy":
+            data[field] = yt.YTArray(data[field], "erg/g")
+        elif field == "time":
+            data[field] = yt.YTArray(data[field], "s")
+        elif field == "temperature":
+            data[field] = yt.YTArray(data[field], "K")
+        elif field == "pressure":
+            data[field] = yt.YTArray(data[field], "dyne/cm**2")
+        else:
+            data[field] = np.array(data[field])
+    return data
