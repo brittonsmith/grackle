@@ -22,7 +22,7 @@ import yt
 from pygrackle import \
     FluidContainer, \
     chemistry_data, \
-    evolve_constant_pressure
+    evolve_constant_density
 
 from pygrackle.utilities.physical_constants import \
     mass_hydrogen_cgs, \
@@ -32,12 +32,12 @@ from pygrackle.utilities.physical_constants import \
 tiny_number = 1e-20
 
 if __name__ == "__main__":
-    current_redshift = 1.
+    current_redshift = 0.
 
     # Set initial values
-    density             = 0.001 # 1 / cm^3
+    density             = 0.1 # g /cm^3
     initial_temperature = 1.e6 # K
-    final_time          = 1000.0 # Myr
+    final_time          = 100.0 # Myr
 
     # Set solver parameters
     my_chemistry = chemistry_data()
@@ -84,7 +84,7 @@ if __name__ == "__main__":
         fc["DII"][:] = tiny_number * fc["density"]
         fc["HDI"][:] = tiny_number * fc["density"]
     if my_chemistry.metal_cooling == 1:
-        fc["metal"][:] = 0. * fc["density"] * \
+        fc["metal"][:] = 0.1 * fc["density"] * \
           my_chemistry.SolarMetalFractionByMass
 
     fc["x-velocity"][:] = 0.0
@@ -99,8 +99,8 @@ if __name__ == "__main__":
     # timestepping safety factor
     safety_factor = 0.01
 
-    # let gas cool at constant pressure
-    data = evolve_constant_pressure(
+    # let gas cool at constant density
+    data = evolve_constant_density(
         fc, final_time=final_time,
         safety_factor=safety_factor)
 
@@ -113,10 +113,10 @@ if __name__ == "__main__":
         (data["energy"] * (my_chemistry.Gamma - 1.) *
          fc.chemistry_data.temperature_units)
     pyplot.twinx()
-    p2, = pyplot.loglog(data["time"].to("Myr"), data['density'],
-                        color="red", label="$\\rho$ [g/cm$^{-3}$]")
-    pyplot.ylabel("$\\rho$ [g/cm$^{-3}$]")
-    pyplot.legend([p1,p2],["T","$\\rho$"], fancybox=True,
+    p2, = pyplot.semilogx(data["time"].to("Myr"), data["mu"],
+                          color="red", label="$\\mu$")
+    pyplot.ylabel("$\\mu$")
+    pyplot.legend([p1,p2],["T","$\\mu$"], fancybox=True,
                   loc="center left")
     pyplot.savefig("cooling_cell.png")
 
