@@ -140,8 +140,6 @@ def evolve_constant_density(fc, final_temperature=None,
 
     data = defaultdict(list)
     current_time = 0.0
-    fc.calculate_cooling_time()
-    dt = safety_factor * np.abs(fc["cooling_time"][0])
     fc.calculate_temperature()
     while True:
         if final_temperature is not None and fc["temperature"][0] <= final_temperature:
@@ -149,7 +147,8 @@ def evolve_constant_density(fc, final_temperature=None,
         if final_time is not None and current_time >= final_time:
             break
 
-        fc.calculate_temperature()
+        fc.calculate_cooling_time()
+        dt = safety_factor * np.abs(fc["cooling_time"][0])
         print("Evolve constant density - t: %e yr, rho: %e g/cm^3, T: %e K." %
               (current_time * my_chemistry.time_units / sec_per_year,
                fc["density"][0] * my_chemistry.density_units,
