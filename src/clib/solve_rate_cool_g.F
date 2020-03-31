@@ -6,7 +6,7 @@
       subroutine solve_rate_cool_g(icool, d, e, u, v, w, de,
      &                HI, HII, HeI, HeII, HeIII,
      &                in, jn, kn, nratec, iexpand, 
-     &                ispecies, imetal, imcool, idust,
+     &                ispecies, imetal, imcool, imcoolonly, idust,
      &                idustall, idustfield, idim,
      &                is, js, ks, ie, je, ke, ih2co, ipiht, igammah,
      &                dx, dt, aye, temstart, temend, 
@@ -158,7 +158,7 @@
 
       integer icool, in, jn, kn, is, js, ks, ie, je, ke, nratec, 
      &        iexpand, ih2co, ipiht, ispecies, imetal, idim,
-     &        ierr, imcool, idust, idustall, idustfield,
+     &        ierr, imcool, imcoolonly, idust, idustall, idustfield,
      &        igammah, ih2optical, iciecool, ithreebody,
      &        ndratec, clnew, iVheat, iMheat, iH2shield, iradshield,
      &        iradtrans, iradcoupled, iradstep, irt_honly,
@@ -454,7 +454,7 @@ c      chunit = (7.17775e-12_DKIND)/(2._DKIND*uvel*uvel*mh)   ! 4.5 eV per H2 fo
             call cool1d_multi_g(
      &                d, e, u, v, w, de, HI, HII, HeI, HeII, HeIII,
      &                in, jn, kn, nratec, 
-     &                iexpand, ispecies, imetal, imcool,
+     &                iexpand, ispecies, imetal, imcool, imcoolonly,
      &                idust, idustall, idustfield,
      &                idim, is, ie, j, k, ih2co, ipiht, iter, igammah,
      &                aye, temstart, temend, z_solar, fgr,

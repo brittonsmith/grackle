@@ -6,7 +6,7 @@
       subroutine cool1d_multi_g(
      &                d, e, u, v, w, de, HI, HII, HeI, HeII, HeIII,
      &                in, jn, kn, nratec, 
-     &                iexpand, ispecies, imetal, imcool,
+     &                iexpand, ispecies, imetal, imcool, imcoolonly,
      &                idust, idustall, idustfield,
      &                idim, is, ie, j, k, ih2co, ipiht, iter, igammah,
      &                aye, temstart, temend, z_solar, fgr,
@@ -72,7 +72,7 @@
 
       integer in, jn, kn, is, ie, j, k, nratec, idim,
      &        iexpand, ih2co, ipiht, ispecies, imcool,
-     &        idust, idustall, idustfield,
+     &        imcoolonly, idust, idustall, idustfield,
      &        imetal, igammah, ih2optical, iciecool, clnew,
      &        iVheat, iMheat, iradtrans, iradshield,
      &        iisrffield

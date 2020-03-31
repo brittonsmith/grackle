@@ -49,6 +49,9 @@ typedef struct
      0) off, 1) on */
   int metal_cooling;
 
+  /* get cooling/heating from metals only */
+  int metal_cooling_only;
+
   /* add heating from UV background model
      0) off, 1) on */
   int UVbackground;
