@@ -63,6 +63,12 @@ cdef class chemistry_data:
         def __set__(self, val):
             self.data.metal_cooling = val
 
+    property metal_cooling_only:
+        def __get__(self):
+            return self.data.metal_cooling_only
+        def __set__(self, val):
+            self.data.metal_cooling_only = val
+
     property UVbackground:
         def __get__(self):
             return self.data.UVbackground
