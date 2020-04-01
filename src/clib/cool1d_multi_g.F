@@ -160,18 +160,24 @@
 
 !  Iteration mask
 
-      logical itmask(in), anydust, interp
+      logical itmask(in), anydust, interp, doprimordial
 
 !\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\/////////////////////////////////
 !=======================================================================
 
+!     Set flag to do things related to primordial chemistry/cooling
+
+      doprimordial = (imcoolonly .eq. 0)
+
 !     Set flag for dust-related options
 
-      anydust = (idust .gt. 0) .or. (idustall .gt. 0)
+      anydust = ((idust .gt. 0) .or. (idustall .gt. 0))
+     &     .and. (doprimordial)
 
 !     Set flag for needing interpolation variables
 
-      interp = (ispecies .gt. 0) .or. (idustall .gt. 0)
+      interp = ((ispecies .gt. 0) .or. (idustall .gt. 0))
+     &     .and. (doprimordial)
 
 !     Set log values of start and end of lookup tables
 
@@ -376,7 +382,7 @@
 
 !     --- 6 species cooling ---
 
-      if (ispecies .gt. 0) then
+      if ((doprimordial) .and. (ispecies .gt. 0)) then
 
       do i = is+1, ie+1
          if ( itmask(i) ) then
@@ -464,7 +470,7 @@
      
 !     --- H2 cooling ---
 
-      if (ispecies .gt. 1) then
+      if ((doprimordial) .and. (ispecies .gt. 1)) then
 
 #define USE_GLOVER_ABEL2008
 #ifdef USE_GLOVER_ABEL2008
@@ -651,7 +657,7 @@ c               ciefudge, which is applied to the continuum, is applied to edot
 
 !     --- Cooling from HD ---
 
-      if (ispecies .gt. 2) then
+      if ((doprimordial) .and. (ispecies .gt. 2)) then
          do i = is+1, ie+1
             if ( itmask(i) ) then
 c CMB cooling floor
@@ -686,7 +692,7 @@ c  new (correct) way: (april 4, 2007)
 
 !     Calculate dust to gas ratio
 
-      if (anydust .or. (igammah .gt. 0)) then
+      if ((doprimordial) .and. (anydust .or. (igammah .gt. 0))) then
          if (idustfield .gt. 0) then
             do i = is+1, ie+1
                if ( itmask(i) ) then
@@ -704,7 +710,7 @@ c  new (correct) way: (april 4, 2007)
 
 !     Calculate interstellar radiation field
 
-      if (anydust .or. (igammah .gt. 1)) then
+      if ((doprimordial) .and. (anydust .or. (igammah .gt. 1))) then
          if (iisrffield .gt. 0) then
             do i = is+1, ie+1
                if ( itmask(i) ) then
@@ -754,7 +760,7 @@ c  new (correct) way: (april 4, 2007)
 !     --- Compute (external) radiative heating terms ---
 !     Photoionization heating
 
-      if (ispecies .gt. 0) then
+      if ((doprimordial) .and. (ispecies .gt. 0)) then
 
       if (iradshield == 0) then ! no shielding
         do i = is+1, ie+1
@@ -913,7 +919,7 @@ c  new (correct) way: (april 4, 2007)
 
 !     --- Cloudy primordial cooling and heating ---
 
-      if (ispecies .eq. 0) then
+      if ((doprimordial) .and. (ispecies .eq. 0)) then
 
          iZscale = 0
          mycmbTfloor = 0
@@ -946,6 +952,7 @@ c  new (correct) way: (april 4, 2007)
       endif
 
 !     Photo-electric heating by UV-irradiated dust
+      if (doprimordial) then
 
       if (igammah .eq. 1) then
 
@@ -1061,7 +1068,9 @@ c  new (correct) way: (april 4, 2007)
 
             endif
           enddo
-        endif
+      endif
+
+      endif ! if (doprimordial)
 
 !     --- Cloudy metal cooling and heating ---
 
@@ -1097,6 +1106,8 @@ c  new (correct) way: (april 4, 2007)
 
 !     Add user-provided volumetric and/or specific heating terms
 
+      if (doprimordial) then
+
       if (iVheat .eq. 1) then
 
       do i = is+1, ie+1
@@ -1115,6 +1126,8 @@ c  new (correct) way: (april 4, 2007)
      &          / coolunit / dom
          end if
       enddo
+
+      endif
 
       endif
 
