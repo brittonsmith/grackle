@@ -134,30 +134,10 @@ def evolve_constant_density(fc, final_temperature=None,
                fc["density"][0] * my_chemistry.density_units,
                fc["temperature"][0]))
         fc.solve_chemistry(dt)
-
-        for field in fc.density_fields:
-            data[field].append(fc[field][0] * my_chemistry.density_units)
-        data["energy"].append(fc["energy"][0])
-        fc.calculate_temperature()
-        data["temperature"].append(fc["temperature"][0])
-        fc.calculate_pressure()
-        data["pressure"].append(fc["pressure"][0])
-        data["time"].append(current_time * my_chemistry.time_units)
+        add_to_data(fc, data, current_time)
         current_time += dt
 
-    for field in data:
-        if field in fc.density_fields:
-            data[field] = yt.YTArray(data[field], "g/cm**3")
-        elif field == "energy":
-            data[field] = yt.YTArray(data[field], "erg/g")
-        elif field == "time":
-            data[field] = yt.YTArray(data[field], "s")
-        elif field == "temperature":
-            data[field] = yt.YTArray(data[field], "K")
-        elif field == "pressure":
-            data[field] = yt.YTArray(data[field], "dyne/cm**2")
-        else:
-            data[field] = np.array(data[field])
+    create_data_arrays(fc, data)
     return data
 
 def evolve_constant_pressure(fc, final_temperature=None,
@@ -172,10 +152,8 @@ def evolve_constant_pressure(fc, final_temperature=None,
     current_time = 0.0
     fc.calculate_cooling_time()
     dt = safety_factor * np.abs(fc["cooling_time"][0])
+
     fc.calculate_temperature()
-    fc.calculate_pressure()
-    initial_density = fc["density"][0]
-    initial_pressure = fc["pressure"][0]
     current_temperature = fc["temperature"][0]
 
     while True:
@@ -192,8 +170,9 @@ def evolve_constant_pressure(fc, final_temperature=None,
                fc["temperature"][0]))
         fc.solve_chemistry(dt)
 
-
+        fc.calculate_temperature()
         t_ratio = current_temperature / fc["temperature"][0]
+        current_temperature = fc["temperature"][0]
 
         fc["density"][:] *= t_ratio
         if my_chemistry.primordial_chemistry > 0:
@@ -212,8 +191,6 @@ def evolve_constant_pressure(fc, final_temperature=None,
             fc["DII"][:] *= t_ratio
             fc["HDI"][:] *= t_ratio
         fc["metal"][:] *= t_ratio
-
-        current_temperature = fc["temperature"][0]
         
         add_to_data(fc, data, current_time)
         current_time += dt

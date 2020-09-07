@@ -108,7 +108,7 @@ class FluidContainer(dict):
                  self.chemistry_data.temperature_units)
             self["mean_molecular_weight"] = self["mu"]
             return
-            
+
         # Default to mu=1
         self["mu"] = np.ones(self["energy"].size)
         self["mean_molecular_weight"] = self["mu"]
