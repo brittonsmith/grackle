@@ -120,8 +120,6 @@ def evolve_constant_density(fc, final_temperature=None,
 
     data = defaultdict(list)
     current_time = 0.0
-    fc.calculate_cooling_time()
-    dt = safety_factor * np.abs(fc["cooling_time"][0])
     fc.calculate_temperature()
     while True:
         if final_temperature is not None and fc["temperature"][0] <= final_temperature:
@@ -129,13 +127,71 @@ def evolve_constant_density(fc, final_temperature=None,
         if final_time is not None and current_time >= final_time:
             break
 
-        fc.calculate_temperature()
+        fc.calculate_cooling_time()
+        dt = safety_factor * np.abs(fc["cooling_time"][0])
+        print("Evolve constant density - t: %e yr, rho: %e g/cm^3, T: %e K." %
+              (current_time * my_chemistry.time_units / sec_per_year,
+               fc["density"][0] * my_chemistry.density_units,
+               fc["temperature"][0]))
+        fc.solve_chemistry(dt)
+        add_to_data(fc, data, current_time)
+        current_time += dt
+
+    create_data_arrays(fc, data)
+    return data
+
+def evolve_constant_pressure(fc, final_temperature=None,
+                            final_time=None, safety_factor=0.01):
+    my_chemistry = fc.chemistry_data
+
+    if final_temperature is None and final_time is None:
+        raise RuntimeError("Must specify either final_temperature " +
+                           "or final_time.")
+
+    data = defaultdict(list)
+    current_time = 0.0
+    fc.calculate_cooling_time()
+    dt = safety_factor * np.abs(fc["cooling_time"][0])
+
+    fc.calculate_temperature()
+    current_temperature = fc["temperature"][0]
+
+    while True:
+        if final_temperature is not None and fc["temperature"][0] <= final_temperature:
+            break
+        if final_time is not None and current_time >= final_time:
+            break
+
+        fc.calculate_cooling_time()
+        dt = safety_factor * np.abs(fc["cooling_time"][0])
         print("Evolve constant density - t: %e yr, rho: %e g/cm^3, T: %e K." %
               (current_time * my_chemistry.time_units / sec_per_year,
                fc["density"][0] * my_chemistry.density_units,
                fc["temperature"][0]))
         fc.solve_chemistry(dt)
 
+        fc.calculate_temperature()
+        t_ratio = current_temperature / fc["temperature"][0]
+        current_temperature = fc["temperature"][0]
+
+        fc["density"][:] *= t_ratio
+        if my_chemistry.primordial_chemistry > 0:
+            fc["HII"][:] *= t_ratio
+            fc["HI"][:] *= t_ratio
+            fc["HeI"][:] *= t_ratio
+            fc["HeII"][:] *= t_ratio
+            fc["HeIII"][:] *= t_ratio
+            fc["de"][:] *= t_ratio
+        if my_chemistry.primordial_chemistry > 1:
+            fc["HM"][:] *= t_ratio
+            fc["H2I"][:] *= t_ratio
+            fc["H2II"][:] *= t_ratio
+        if my_chemistry.primordial_chemistry > 2:
+            fc["DI"][:] *= t_ratio
+            fc["DII"][:] *= t_ratio
+            fc["HDI"][:] *= t_ratio
+        fc["metal"][:] *= t_ratio
+        
         add_to_data(fc, data, current_time)
         current_time += dt
 
