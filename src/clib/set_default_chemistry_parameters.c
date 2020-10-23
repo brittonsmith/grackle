@@ -44,7 +44,7 @@ chemistry_data _set_default_chemistry_parameters(void)
   my_chemistry.primordial_chemistry           = 0;
   my_chemistry.dust_chemistry                 = 0;
   my_chemistry.metal_cooling                  = FALSE;
-  my_chemistry.only_metal_cooling             = FALSE;
+  my_chemistry.metal_cooling_only             = FALSE;
   my_chemistry.h2_on_dust                     = FALSE;
   my_chemistry.use_dust_density_field         = FALSE;
 
