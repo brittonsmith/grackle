@@ -114,8 +114,9 @@ def _data_to_fc(data, size=None, fc=None):
 
     return fc
 
-def prepare_grackle_data(ds, parameters=None):
-    sim_type = type(ds)
+def prepare_grackle_data(ds, parameters=None, sim_type=None):
+    if sim_type is None:
+        sim_type = type(ds)
     par_map = _parameter_map.get(sim_type)
     if par_map is None:
         raise RuntimeError(
