@@ -15,7 +15,7 @@ from pygrackle.utilities.physical_constants import \
     boltzmann_constant_cgs, \
     mass_hydrogen_cgs
 
-from grackle_defs cimport *
+from .grackle_defs cimport *
 import numpy as np
 cimport numpy as np
 
@@ -62,6 +62,12 @@ cdef class chemistry_data:
             return self.data.metal_cooling
         def __set__(self, val):
             self.data.metal_cooling = val
+
+    property metal_cooling_only:
+        def __get__(self):
+            return self.data.metal_cooling_only
+        def __set__(self, val):
+            self.data.metal_cooling_only = val
 
     property UVbackground:
         def __get__(self):

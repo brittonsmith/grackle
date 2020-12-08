@@ -5,7 +5,7 @@
      &                d, e, u, v, w, de, HI, HII, HeI, HeII, HeIII,
      &                  cooltime,
      &                in, jn, kn, nratec, iexpand, 
-     &                ispecies, imetal, imcool, idust,
+     &                ispecies, imetal, imcool, imcoolonly, idust,
      &                idustall, idustfield, idim,
      &                is, js, ks, ie, je, ke, ih2co, ipiht, igammah,
      &                aye, temstart, temend,
@@ -62,7 +62,7 @@
 
       integer in, jn, kn, is, js, ks, ie, je, ke, nratec, 
      &        iexpand, ih2co, ipiht, ispecies, imetal, idim,
-     &        imcool, idust, idustall,
+     &        imcool, imcoolonly, idust, idustall,
      &        idustfield, igammah, ih2optical, iciecool,
      &        clnew, iVheat, iMheat, iradtrans, iradshield,
      &        iisrffield
@@ -252,7 +252,7 @@
          call cool1d_multi_g(     
      &                d, e, u, v, w, de, HI, HII, HeI, HeII, HeIII,
      &                in, jn, kn, nratec, 
-     &                iexpand, ispecies, imetal, imcool,
+     &                iexpand, ispecies, imetal, imcool, imcoolonly,
      &                idust, idustall, idustfield,
      &                idim, is, ie, j, k, ih2co, ipiht, 1, igammah,
      &                aye, temstart, temend, z_solar, fgr,

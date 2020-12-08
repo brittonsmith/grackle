@@ -9,6 +9,7 @@ cdef extern from "grackle_chemistry_data.h":
         int primordial_chemistry
         int dust_chemistry
         int metal_cooling
+        int metal_cooling_only
         int UVbackground
         char *grackle_data_file
         int cmb_temperature_floor
