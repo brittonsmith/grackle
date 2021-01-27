@@ -467,14 +467,16 @@ def solve_chemistry(fc, my_dt):
 
     cdef int grid_dimension
     grid_dimension = fc["density"].shape[0]
-    cdef np.ndarray ref_gs, ref_ge
+    cdef np.ndarray ref_gs, ref_ge, ref_dim
     ref_gs = np.zeros(3, dtype="int32")
     ref_ge = np.zeros(3, dtype="int32")
+    ref_dim = np.ones(3, dtype="int32")
     ref_ge[0] = grid_dimension -1
+    ref_dim[0] = grid_dimension
 
     cdef c_field_data my_fields
     my_fields.grid_rank = 1
-    my_fields.grid_dimension = &grid_dimension
+    my_fields.grid_dimension = <int *> ref_dim.data
     my_fields.grid_start = <int *> ref_gs.data
     my_fields.grid_end = <int *> ref_ge.data
     my_fields.density = get_field(fc, "density")
@@ -512,14 +514,16 @@ def calculate_cooling_time(fc):
 
     cdef int grid_dimension
     grid_dimension = fc["density"].shape[0]
-    cdef np.ndarray ref_gs, ref_ge
+    cdef np.ndarray ref_gs, ref_ge, ref_dim
     ref_gs = np.zeros(3, dtype="int32")
     ref_ge = np.zeros(3, dtype="int32")
+    ref_dim = np.ones(3, dtype="int32")
     ref_ge[0] = grid_dimension -1
+    ref_dim[0] = grid_dimension
 
     cdef c_field_data my_fields
     my_fields.grid_rank = 1
-    my_fields.grid_dimension = &grid_dimension
+    my_fields.grid_dimension = <int *> ref_dim.data
     my_fields.grid_start = <int *> ref_gs.data
     my_fields.grid_end = <int *> ref_ge.data
     my_fields.density = get_field(fc, "density")
@@ -561,14 +565,16 @@ def calculate_gamma(fc):
 
     cdef int grid_dimension
     grid_dimension = fc["density"].shape[0]
-    cdef np.ndarray ref_gs, ref_ge
+    cdef np.ndarray ref_gs, ref_ge, ref_dim
     ref_gs = np.zeros(3, dtype="int32")
     ref_ge = np.zeros(3, dtype="int32")
+    ref_dim = np.ones(3, dtype="int32")
     ref_ge[0] = grid_dimension -1
+    ref_dim[0] = grid_dimension
 
     cdef c_field_data my_fields
     my_fields.grid_rank = 1
-    my_fields.grid_dimension = &grid_dimension
+    my_fields.grid_dimension = <int *> ref_dim.data
     my_fields.grid_start = <int *> ref_gs.data
     my_fields.grid_end = <int *> ref_ge.data
     my_fields.density = get_field(fc, "density")
@@ -610,14 +616,16 @@ def calculate_pressure(fc):
 
     cdef int grid_dimension
     grid_dimension = fc["density"].shape[0]
-    cdef np.ndarray ref_gs, ref_ge
+    cdef np.ndarray ref_gs, ref_ge, ref_dim
     ref_gs = np.zeros(3, dtype="int32")
     ref_ge = np.zeros(3, dtype="int32")
+    ref_dim = np.ones(3, dtype="int32")
     ref_ge[0] = grid_dimension -1
+    ref_dim[0] = grid_dimension
 
     cdef c_field_data my_fields
     my_fields.grid_rank = 1
-    my_fields.grid_dimension = &grid_dimension
+    my_fields.grid_dimension = <int *> ref_dim.data
     my_fields.grid_start = <int *> ref_gs.data
     my_fields.grid_end = <int *> ref_ge.data
     my_fields.density = get_field(fc, "density")
@@ -659,14 +667,16 @@ def calculate_temperature(fc):
 
     cdef int grid_dimension
     grid_dimension = fc["density"].shape[0]
-    cdef np.ndarray ref_gs, ref_ge
+    cdef np.ndarray ref_gs, ref_ge, ref_dim
     ref_gs = np.zeros(3, dtype="int32")
     ref_ge = np.zeros(3, dtype="int32")
+    ref_dim = np.ones(3, dtype="int32")
     ref_ge[0] = grid_dimension -1
+    ref_dim[0] = grid_dimension
 
     cdef c_field_data my_fields
     my_fields.grid_rank = 1
-    my_fields.grid_dimension = &grid_dimension
+    my_fields.grid_dimension = <int *> ref_dim.data
     my_fields.grid_start = <int *> ref_gs.data
     my_fields.grid_end = <int *> ref_ge.data
     my_fields.density = get_field(fc, "density")
@@ -708,14 +718,16 @@ def calculate_dust_temperature(fc):
 
     cdef int grid_dimension
     grid_dimension = fc["density"].shape[0]
-    cdef np.ndarray ref_gs, ref_ge
+    cdef np.ndarray ref_gs, ref_ge, ref_dim
     ref_gs = np.zeros(3, dtype="int32")
     ref_ge = np.zeros(3, dtype="int32")
+    ref_dim = np.ones(3, dtype="int32")
     ref_ge[0] = grid_dimension -1
+    ref_dim[0] = grid_dimension
 
     cdef c_field_data my_fields
     my_fields.grid_rank = 1
-    my_fields.grid_dimension = &grid_dimension
+    my_fields.grid_dimension = <int *> ref_dim.data
     my_fields.grid_start = <int *> ref_gs.data
     my_fields.grid_end = <int *> ref_ge.data
     my_fields.density = get_field(fc, "density")
