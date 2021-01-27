@@ -93,7 +93,11 @@ def _get_needed_fields(my_chemistry):
     if my_chemistry.use_dust_density_field == 1:
         fields += ['dust']
     if my_chemistry.use_radiative_transfer == 1:
-        fields += ['RT_heating_rate']
+        fields += ['RT_heating_rate',
+                   'RT_HI_ionization_rate',
+                   'RT_HeI_ionization_rate',
+                   'RT_HeII_ionization_rate',
+                   'RT_H2_dissociation_rate']
     return fields
 
 def _data_to_fc(data, size=None, fc=None):
