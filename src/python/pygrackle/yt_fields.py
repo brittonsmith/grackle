@@ -72,7 +72,11 @@ _field_map = {
     'y-velocity': (('gas', 'velocity_y'), 'code_velocity'),
     'z-velocity': (('gas', 'velocity_z'), 'code_velocity'),
     'energy': (('gas', 'thermal_energy'), 'code_velocity**2'),
-    'RT_heating_rate': (('gas', 'photo_gamma'), 'erg/s')
+    'RT_heating_rate': (('gas', 'photo_gamma'), 'erg/s'),
+    'RT_HI_ionization_rate': (('gas', 'H_p0_ionization_rate'), '1 / code_time'),
+    'RT_HeI_ionization_rate': (('gas', 'He_p0_ionization_rate'), '1 / code_time'),
+    'RT_HeII_ionization_rate': (('gas', 'He_p1_ionization_rate'), '1 / code_time'),
+    'RT_H2_dissociation_rate': (('gas', 'H2_p0_dissociation_rate'), '1 / code_time')
 }
 
 def _get_needed_fields(my_chemistry):
