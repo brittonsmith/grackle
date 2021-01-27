@@ -118,7 +118,7 @@ def _data_to_fc(data, size=None, fc=None):
 
     return fc
 
-def prepare_grackle_data(ds, parameters=None, sim_type=None):
+def prepare_grackle_data(ds, parameters=None, sim_type=None, initialize=True):
     if sim_type is None:
         sim_type = type(ds)
     par_map = _parameter_map.get(sim_type)
@@ -153,7 +153,8 @@ def prepare_grackle_data(ds, parameters=None, sim_type=None):
     my_chemistry.a_units = 1 / (1 + ds.parameters.get('CosmologyInitialRedshift', 0))
     my_chemistry.a_value = 1 / (1 + ds.current_redshift) / my_chemistry.a_units
     my_chemistry.velocity_units = ds.velocity_unit.in_cgs().d
-    my_chemistry.initialize()
+    if initialize:
+        my_chemistry.initialize()
     ds.grackle_data = my_chemistry
 
 
