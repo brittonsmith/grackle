@@ -25,7 +25,7 @@ from pygrackle import \
     evolve_constant_density
 
 from pygrackle.one_zone import \
-    ConstantDensityModel
+    ConstantPressureModel
 
 from pygrackle.utilities.physical_constants import \
     mass_hydrogen_cgs, \
@@ -100,7 +100,7 @@ if __name__ == "__main__":
     fc.calculate_temperature()
     fc["energy"][:] *= initial_temperature / fc["temperature"]
 
-    model = ConstantDensityModel(
+    model = ConstantPressureModel(
         fc, safety_factor=0.01,
         final_time=final_time)
     model.evolve()
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     pyplot.legend([p1,p2],["T","$\\mu$"], fancybox=True,
                   loc="center left")
     pyplot.tight_layout()
-    name = "constant_density"
+    name = "constant_pressure"
     pyplot.savefig(f"{name}.png")
 
     # save data arrays as a yt dataset

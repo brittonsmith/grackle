@@ -99,6 +99,9 @@ class OneZoneModel(abc.ABC):
           f"rho: {cdensity:e} g/cm^3, T: {ctemperature:e} K."
         print (status, flush=True)
 
+    def before_solve_chemistry(self):
+        pass
+
     def evolve(self):
         self.data = defaultdict(list)
         self.current_time = 0
@@ -108,6 +111,7 @@ class OneZoneModel(abc.ABC):
         while not self.finished:
             dt = self.calculate_timestep()
 
+            self.before_solve_chemistry()
             self.fc.solve_chemistry(dt)
 
             self.current_time += dt
@@ -116,10 +120,7 @@ class OneZoneModel(abc.ABC):
             self.print_status()
             self.add_to_data()
 
-
-class ConstantDensityModel(OneZoneModel):
-    _name = "constant density"
-
+class CoolingModel(OneZoneModel):
     def __init__(self, fc, safety_factor=0.1,
                  final_time=None, final_temperature=None):
 
@@ -150,5 +151,28 @@ class ConstantDensityModel(OneZoneModel):
         dt = min(dt, self.final_time - self.current_time)
         return dt
 
+class ConstantDensityModel(CoolingModel):
+    _name = "constant density"
+
     def update_quantities(self):
         pass
+
+class ConstantPressureModel(CoolingModel):
+    _name = "constant pressure"
+
+    def before_solve_chemistry(self):
+        fc = self.fc
+        fc.calculate_temperature()
+        self.last_temperature = fc["temperature"][0]
+
+    def update_quantities(self):
+        fc = self.fc
+        my_chemistry = fc.chemistry_data
+
+        fc.calculate_temperature()
+        t_ratio = self.last_temperature / fc["temperature"][0]
+
+        for field in fc.density_fields:
+            if field == "dark_matter":
+                continue
+            fc[field][:] *= t_ratio
