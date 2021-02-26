@@ -54,6 +54,7 @@ _parameter_map[EnzoDataset] = {
 
 _field_map = {
     'density': (('gas', 'density'), 'code_mass / code_length**3'),
+    'dark_matter': (('gas', 'dark_matter_density'), 'code_mass / code_length**3'),
     'HI': (('gas', 'H_p0_density'), 'code_mass / code_length**3'),
     'HII': (('gas', 'H_p1_density'), 'code_mass / code_length**3'),
     'HM': (('gas', 'H_m1_density'), 'code_mass / code_length**3'),
@@ -80,7 +81,7 @@ _field_map = {
 }
 
 def _get_needed_fields(my_chemistry):
-    fields = ['density', 'energy'] + \
+    fields = ['density', 'energy', 'dark_matter'] + \
       ['%s-velocity' % ax for ax in 'xyz']
     if my_chemistry.primordial_chemistry > 0:
         fields += ['HI', 'HII', 'HeI', 'HeII', 'HeIII', 'de']
