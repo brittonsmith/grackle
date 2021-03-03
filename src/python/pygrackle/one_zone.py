@@ -331,11 +331,11 @@ class FreeFallModel(OneZoneModel):
         if gamma_eff < 0.83:
             force_factor = 0.0
         elif gamma_eff < 1.0:
-            force_factor = 0.6 + 2.5 * (gamma_eff - 1) - \
-                6.0 * np.power((gamma_eff - 1.0), 2.)
+            X = gamma_eff - 1
+            force_factor = 0.6 + 2.5 * X - 6.0 * np.power(X, 2.)
         else:
-            force_factor = 1.0 + 0.2 * (gamma_eff - (4./3.)) - \
-                2.9 * np.power((gamma_eff - (4./3.)), 2.)
+            X = gamma_eff - 4/3
+            force_factor = 1.0 + 0.2 * X - 2.9 * np.power(X, 2.)
         force_factor = max(force_factor, 0.0)
         force_factor = min(force_factor, 0.95)
 
