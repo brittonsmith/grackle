@@ -118,7 +118,7 @@ if __name__ == "__main__":
     pyplot.legend([p1,p2],["T","$\\mu$"], fancybox=True,
                   loc="center left")
     pyplot.tight_layout()
-    name = "constant_density"
+    name = model.name
     pyplot.savefig(f"{name}.png")
 
     # save data arrays as a yt dataset
