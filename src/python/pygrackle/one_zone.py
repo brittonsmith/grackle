@@ -267,10 +267,9 @@ class FreeFallModel(OneZoneModel):
                     (32. * self.gravitational_constant *
                      fc["density"][0])), 0.5)
 
-        # fc.calculate_cooling_time()
-        # dt_cool = self.safety_factor * \
-        #   np.abs(fc["cooling_time"][0])
-        dt_cool = np.inf
+        fc.calculate_cooling_time()
+        dt_cool = self.safety_factor * \
+          np.abs(fc["cooling_time"][0])
 
         dt = min(dt_ff, dt_cool)
         dt = min(dt, self.remaining_time)
