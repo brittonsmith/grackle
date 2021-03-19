@@ -333,6 +333,11 @@ cdef class chemistry_data:
         def __set__(self, val):
             self.data.H2_self_shielding = val
 
+    property k1:
+        def __get__(self):
+            cdef double[:] memview = <double[:self.NumberOfTemperatureBins]>(<double*> self.rates.k1)
+            return np.asarray(memview)
+
     property k24:
         def __get__(self):
             return self.rates.k24

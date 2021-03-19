@@ -53,6 +53,7 @@ cdef extern from "grackle_chemistry_data.h":
         int H2_self_shielding
 
     ctypedef struct c_chemistry_data_storage "chemistry_data_storage":
+        double *k1
         double k24
         double k25
         double k26
