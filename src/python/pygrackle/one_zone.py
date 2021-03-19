@@ -129,6 +129,9 @@ class OneZoneModel(abc.ABC):
                 continue
             fc[field][:] *= factor
 
+    def before_solve_chemistry(self):
+        pass
+
     def evolve(self):
         if self.data is None:
             self.current_time = 0
@@ -139,6 +142,8 @@ class OneZoneModel(abc.ABC):
         self.print_status()
 
         while not self.finished:
+            self.before_solve_chemistry()
+
             dt = self.calculate_timestep()
 
             self.fc.solve_chemistry(dt)
@@ -245,7 +250,7 @@ class FreeFallModel(OneZoneModel):
 
         # some constants for the analytical free-fall solution
         self.freefall_time_constant = \
-          np.power(((32. * self.gravitational_constant) /
+          np.power(((32 * self.gravitational_constant) /
                     (3. * np.pi)), 0.5)
 
     @property
@@ -264,7 +269,7 @@ class FreeFallModel(OneZoneModel):
         fc = self.fc
         dt_ff = self.safety_factor * \
           np.power(((3. * np.pi) /
-                    (32. * self.gravitational_constant *
+                    (32 * self.gravitational_constant *
                      fc["density"][0])), 0.5)
 
         fc.calculate_cooling_time()
@@ -340,3 +345,95 @@ class FreeFallModel(OneZoneModel):
         force_factor = min(force_factor, 0.95)
 
         data["force_factor"].append(force_factor)
+
+class FreeFallDarkMatterModel(FreeFallModel):
+    name = "free-fall-dm"
+
+    def calculate_timestep(self):
+        fc = self.fc
+
+        density = fc["density"][0] + fc["dark_matter"][0]
+        dt_ff = self.safety_factor * \
+          np.sqrt((3. * np.pi) /
+                  (16 * self.gravitational_constant * density))
+
+        fc.calculate_cooling_time()
+        dt_cool = self.safety_factor * \
+          np.abs(fc["cooling_time"][0])
+
+        dt = min(dt_ff, dt_cool)
+        dt = min(dt, self.remaining_time)
+        self.dt = dt
+        return dt
+
+    def update_quantities(self):
+        fc = self.fc
+        my_chemistry = fc.chemistry_data
+
+        self.calculate_collapse_factor()
+        force_factor = self.data["force_factor"][-1]
+
+        total_density = fc["density"][0] + fc["dark_matter"][0]
+        factor = np.sqrt(1 - force_factor) * \
+          np.sqrt((16 * self.gravitational_constant * total_density) /
+                  (3 * np.pi)) * self.dt + 1
+
+        self.scale_density_fields(factor)
+
+        # now update energy for adiabatic heating from collapse
+        fc["energy"][0] += (my_chemistry.Gamma - 1.) * fc["energy"][0] * \
+            self.freefall_time_constant * \
+            np.power(fc["density"][0], 0.5) * self.dt
+
+class MinihaloModel(FreeFallDarkMatterModel):
+    name = "minihalo"
+
+    def __init__(self, fc, data=None, external_data=None,
+                 safety_factor=0.01, include_pressure=False,
+                 final_time=None, final_density=None):
+
+        FreeFallDarkMatterModel.__init__(self, fc, data=data,
+                 safety_factor=safety_factor,
+                 include_pressure=include_pressure,
+                 final_time=final_time,
+                 final_density=final_density)
+
+        self.external_data = external_data
+
+    def update_quantities(self):
+        self.fc.calculate_cooling_time()
+        t_cool = self.fc["cooling_time"][0]
+        t_dyn = np.sqrt((3 * np.pi) / (16 * self.gravitational_constant * self.fc["density"][0]))
+        super().update_quantities()
+        # if t_cool > 0 or -t_cool >= t_dyn:
+        #     ConstantEntropyModel.update_quantities(self)
+        #     print ("Entropy")
+        # else:
+        #     FreeFallDarkMatterModel.update_quantities(self)
+        #     print ("Freefall")
+
+    def before_solve_chemistry(self):
+        self.update_external_fields()
+
+    def update_external_fields(self):
+        if self.external_data is None:
+            return
+
+        edata = self.external_data
+        time = edata["time"]
+        itime = np.digitize(self.current_time, time) - 1
+        if itime < 0 or itime >= time.size - 1:
+            return
+
+        efields = [field for field in edata if field != "time"]
+        new_fields = {}
+        for field in efields:
+            fdata = edata[field]
+            if fdata[itime] <= 0 or fdata[itime+1] <= 0:
+                new_fields[field] = fdata[itime]
+            else:
+                slope = (fdata[itime+1] - fdata[itime]) / (time[itime+1] - time[itime])
+                new_fields[field] = slope * (self.current_time - time[itime]) + fdata[itime]
+
+        for field in new_fields:
+            self.fc[field][:] = new_fields[field]

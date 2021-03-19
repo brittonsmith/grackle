@@ -149,9 +149,9 @@ if __name__=="__main__":
                   loc="lower right")
 
     if os.environ.get("METAL_COOLING", 0) == "1":
-        output = "freefall_metal"
+        output = f"{model2.name}_metal"
     else:
-        output = "freefall_new"
+        output = model2.name
 
     pyplot.tight_layout()
     pyplot.savefig("%s.png" % output)
