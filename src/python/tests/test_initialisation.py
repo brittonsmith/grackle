@@ -78,7 +78,7 @@ def test_rate_initialisation():
     f.close()
 
     #* Compare rates with the correct ones which are stored and check they are in agreement.
-    correctRates = h5py.File("tests/example_answers/correct_rates.h5", "r")
+    correctRates = h5py.File("example_answers/correct_rates.h5", "r")
     for rate_key in testRates:
         assert np.allclose(correctRates[rate_key], testRates[rate_key], atol=1e-10), f"Rate Coefficient {rate_key} does not agree."
 
