@@ -24,11 +24,8 @@ def test_rate_initialisation():
     """
     Test that the rate tables are initialized correctly.
 
-    If writeHDF5 is set to true, all rate coefficients calculated in the initialisation routine will 
-    be saved into a hdf5 file. This should be used for testing and is not meant for frequent use.
+    All rate coefficients calculated in the initialisation routine will be saved into a hdf5 file. 
     """
-    #* This should be False in all use cases. Set to True only for testing.
-    writeHDF5 = False
 
     #* Initialise chemistry_data instance
     my_chemistry = chemistry_data()
@@ -55,7 +52,7 @@ def test_rate_initialisation():
     #* Dictionary of all rate variables which will be checked.
     testRates = {"k1": my_chemistry.k1, "k2": my_chemistry.k2, "k3": my_chemistry.k3, "k4": my_chemistry.k4, "k5": my_chemistry.k5,
                 "k6": my_chemistry.k6, "k7": my_chemistry.k7, "k8": my_chemistry.k8, "k9": my_chemistry.k9, "k10": my_chemistry.k10,
-                "k11": my_chemistry.k1, "k12": my_chemistry.k12, "k13": my_chemistry.k13, "k14": my_chemistry.k14, "k15": my_chemistry.k15,
+                "k11": my_chemistry.k11, "k12": my_chemistry.k12, "k13": my_chemistry.k13, "k14": my_chemistry.k14, "k15": my_chemistry.k15,
                 "k16": my_chemistry.k16,"k17": my_chemistry.k17, "k18": my_chemistry.k18, "k19": my_chemistry.k19, "k20": my_chemistry.k20,
                 "k21": my_chemistry.k21, "k22": my_chemistry.k22, "k23": my_chemistry.k23, "k24": my_chemistry.k24, "k25": my_chemistry.k25,
                 "k26": my_chemistry.k26, "k27": my_chemistry.k27, "k28": my_chemistry.k28, "k29": my_chemistry.k29, "k30": my_chemistry.k30,
@@ -65,32 +62,25 @@ def test_rate_initialisation():
                 "ceHeI": my_chemistry.ceHeI, "ceHeII": my_chemistry.ceHeII, "ciHI": my_chemistry.ciHI, "ciHeI": my_chemistry.ciHeI,
                 "ciHeIS": my_chemistry.ciHeIS, "ciHeII": my_chemistry.ciHeII, "reHII": my_chemistry.reHII,"reHeII1": my_chemistry.reHeII1,
                 "reHeII2": my_chemistry.reHeII2,"reHeIII": my_chemistry.reHeIII, "brem": my_chemistry.brem, "hyd01k": my_chemistry.hyd01k,
-                "h2k01": my_chemistry.h2k01, "vibh": my_chemistry.vibh, "orth": my_chemistry.roth, "rotl": my_chemistry.rotl,
+                "h2k01": my_chemistry.h2k01, "vibh": my_chemistry.vibh, "roth": my_chemistry.roth, "rotl": my_chemistry.rotl,
                 "HDlte": my_chemistry.HDlte, "HDlow": my_chemistry.HDlow,"cieco": my_chemistry.cieco, "GAHI": my_chemistry.GAHI,
                 "GAH2": my_chemistry.GAH2, "GAHe": my_chemistry.GAHe, "GAHp": my_chemistry.GAHp, "GAel": my_chemistry.GAel,
                 "H2LTE": my_chemistry.H2LTE, "k13dd": my_chemistry.k13dd, "h2dust": my_chemistry.h2dust}
 
-    #* Write rate coefficients to a hdf5 file if user specified such.
-    if writeHDF5:
-        #If file already exists delete it so that the new one can be created.
-        if os.path.exists("initialised_rates.h5"):
-            os.remove("initialised_rates.h5")
+    #* Write results into a hdf5 file.
+    #If file already exists delete it so that the new one can be created.
+    if os.path.exists("initialised_rates.h5"):
+        os.remove("initialised_rates.h5")
+    #Write the file.
+    f = h5py.File("initialised_rates.h5", "w-")
+    for rate_key in testRates:
+        f.create_dataset(rate_key, data=testRates[rate_key])
+    f.close()
 
-        #Write the file.
-        f = h5py.File("initialised_rates.h5", "w-")
-        for rate_key in testRates:
-            f.create_dataset(rate_key, data=testRates[rate_key])
-        f.close()
-    print("\n", type(my_chemistry.h2dust), type(my_chemistry.k1), "\n")
     #* Compare rates with the correct ones which are stored and check they are in agreement.
     correctRates = h5py.File("tests/example_answers/correct_rates.h5", "r")
     for rate_key in testRates:
-        assert np.allclose(correctRates[rate_key], testRates[rate_key], atol=1e-10), "Rate Coefficient {} does not agree.".format(rate_key)
-
-    print("--------------------------------TEST----------------------------------")
-    print("\n", testRates["k1"], "\n")
-    print("\n", testRates["h2dust"], "\n")
-    print("\n", testRates["cieco"], "\n")
+        assert np.allclose(correctRates[rate_key], testRates[rate_key], atol=1e-10), f"Rate Coefficient {rate_key} does not agree."
 
 
 
