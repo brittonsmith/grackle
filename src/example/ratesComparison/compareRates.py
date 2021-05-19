@@ -107,7 +107,7 @@ rateNames = ["k1-k58_rates", "H2formHeating_rates", "coolingAndHeating_rates",
              "molecHydrogenCooling_rates", "lowDensity_rates", "k13dd", "h2dust"]
 
 #* Test all parameter sets.
-testAll = False
+testAll = True
 if testAll:
     #* Iterate over all of the parameter sets.
     for parameterSet in range(1,7):
@@ -118,8 +118,8 @@ if testAll:
         test_fortran_c(fileNames)
 
 #* Test specific files and parameter sets.      
-showUniqueRates = True
-specificNames = ["k1-k58_rates2.txt", "coolingAndHeating_rates2.txt", "h2dust2.txt"]
-test_fortran_c(specificNames)
+#showUniqueRates = True
+#specificNames = ["k1-k58_rates2.txt", "coolingAndHeating_rates2.txt", "h2dust2.txt"]
+#test_fortran_c(specificNames)
 
 

@@ -485,8 +485,8 @@ int calc_rates_g_c(chemistry_data *userChemistry, chemistry_data_storage *userRa
             } else {
                 //Equation 3.8 from Hollenbach & McKee (1979).
                 userRates->h2dust[i + userChemistry->NumberOfTemperatureBins*j] = 3.0e-17 / fgr * pow(binTemp2, 0.5) / \
-                                                                    (1.0 + 0.4 * pow(binTemp2 + dust_binTemp2, 0.5) + \
-                                                                    0.2 * dust_binTemp2 + 8.0e-2 * pow(dust_binTemp2, 2.0)) / kUnit;
+                                                                    (1.0 + (0.4 * pow(binTemp2 + dust_binTemp2, 0.5)) + \
+                                                                    (0.2 * binTemp2) + 8.0e-2 * pow(binTemp2, 2.0)) / kUnit;
             }
         } // End of loop over dust temperature bins.
 

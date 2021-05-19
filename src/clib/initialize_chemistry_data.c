@@ -67,6 +67,29 @@ extern void FORTRAN_NAME(calc_rates_g)(
      double *dtemend, double *h2dusta, double *ncrca, double *ncrd1a, double *ncrd2a, 
      int *ioutput);
 
+extern void FORTRAN_NAME(calc_rates2_g)(
+     int *ispecies, int *igammah, int *idust, int *idustall,
+     int *nratec, double *aye, double *temstart, double *temend, 
+     int *casebrates, int *threebody,
+     double *uxyz, double *uaye, double *urho, double *utim,
+     double *ceHIa, double *ceHeIa, double *ceHeIIa, double *ciHIa, double *ciHeIa,
+     double *ciHeISa, double *ciHeIIa, double *reHIIa, double *reHeII1a,
+     double *reHeII2a, double *reHeIIIa, double *brema, double *compa, 
+     double *gammahacgs, double *gammaha, double *regra, double *gamma_isrfa,
+     double *hyd01ka, double *h2k01a, double *vibha, double *rotha, double *rotla,
+     double *gpldl, double *gphdl, double *hdlte, double *hdlow, double *cieco,
+     double *gaHIa, double *gaH2a, double *gaHea, double *gaHpa, double *gaela, 
+     double *h2ltea, double *gasgr, 
+     double *k1a, double *k2a, double *k3a, double *k4a, double *k5a, double *k6a,
+     double *k7a, double *k8a, double *k9a, double *k10a,
+     double *k11a, double *k12a, double *k13a, double *k13dda, double *k14a,
+     double *k15a, double *k16a, double *k17a, double *k18a,
+     double *k19a, double *k20a, double *k21a, double *k22, double *k23,
+     double *k50, double *k51, double *k52, double *k53, double *k54, double *k55,
+     double *k56, double *k57, double *k58, int *ndratec, double *dtemstart, 
+     double *dtemend, double *h2dusta, double *ncrca, double *ncrd1a, double *ncrd2a, 
+     int *ioutput);
+
 int calc_rates_g_c(chemistry_data *my_chemistry, chemistry_data_storage *my_rates, code_units *my_units, 
                 double co_length_units, double co_density_units);
 
@@ -344,7 +367,7 @@ int _initialize_chemistry_data(chemistry_data *my_chemistry,
                                 exit(0);
                         }
 
-                        if (useFortran == 1) {
+                        if (useFortran == 1 && parameterSet != 2) {
                                 //printf("\n Using fortran to calculate rates \n");
                                 strcpy(language, "fortran");
                                 FORTRAN_NAME(calc_rates_g)(
@@ -379,7 +402,43 @@ int _initialize_chemistry_data(chemistry_data *my_chemistry,
                                 &my_chemistry->DustTemperatureEnd, my_rates->h2dust, 
                                 my_rates->n_cr_n, my_rates->n_cr_d1, my_rates->n_cr_d2, 
                                 &ioutput);
-                        } else { // Call c function to do the hard work.
+                        } else if (useFortran == 1 && parameterSet == 2) {
+                                strcpy(language, "fortran");
+                                FORTRAN_NAME(calc_rates2_g)(
+                                &my_chemistry->primordial_chemistry, &my_chemistry->photoelectric_heating,
+                                &my_chemistry->h2_on_dust, &my_chemistry->dust_chemistry,
+                                &my_chemistry->NumberOfTemperatureBins, &my_units->a_value,
+                                &my_chemistry->TemperatureStart, &my_chemistry->TemperatureEnd,
+                                &my_chemistry->CaseBRecombination, &my_chemistry->three_body_rate,
+                                &co_length_units, &my_units->a_units, 
+                                &co_density_units, &my_units->time_units,
+                                my_rates->ceHI, my_rates->ceHeI, my_rates->ceHeII, my_rates->ciHI,
+                                        my_rates->ciHeI,
+                                my_rates->ciHeIS, my_rates->ciHeII, my_rates->reHII,
+                                        my_rates->reHeII1,
+                                my_rates->reHeII2, my_rates->reHeIII, my_rates->brem, &my_rates->comp, 
+                                &my_chemistry->photoelectric_heating_rate, &my_rates->gammah, my_rates->regr,
+                                &my_rates->gamma_isrf,
+                                my_rates->hyd01k, my_rates->h2k01, my_rates->vibh, my_rates->roth,
+                                        my_rates->rotl,
+                                my_rates->GP99LowDensityLimit, my_rates->GP99HighDensityLimit,
+                                        my_rates->HDlte, my_rates->HDlow, my_rates->cieco,
+                                my_rates->GAHI, my_rates->GAH2, my_rates->GAHe, my_rates->GAHp,
+                                my_rates->GAel, my_rates->H2LTE, my_rates->gas_grain, 
+                                my_rates->k1, my_rates->k2, my_rates->k3, my_rates->k4, my_rates->k5,
+                                        my_rates->k6, my_rates->k7, my_rates->k8, my_rates->k9, my_rates->k10,
+                                my_rates->k11, my_rates->k12, my_rates->k13, my_rates->k13dd, my_rates->k14,
+                                        my_rates->k15, my_rates->k16, my_rates->k17, my_rates->k18,
+                                my_rates->k19, my_rates->k20, my_rates->k21, my_rates->k22, my_rates->k23,
+                                my_rates->k50, my_rates->k51, my_rates->k52, my_rates->k53, my_rates->k54,
+                                        my_rates->k55, my_rates->k56, my_rates->k57, my_rates->k58,
+                                &my_chemistry->NumberOfDustTemperatureBins, &my_chemistry->DustTemperatureStart, 
+                                &my_chemistry->DustTemperatureEnd, my_rates->h2dust, 
+                                my_rates->n_cr_n, my_rates->n_cr_d1, my_rates->n_cr_d2, 
+                                &ioutput);
+                        }
+                        
+                        else { // Call c function to do the hard work.
                                 //printf("\n Using c to calculate rates \n");
                                 strcpy(language, "c");
                                 calc_rates_g_c(my_chemistry, my_rates, my_units, co_length_units, co_density_units);
