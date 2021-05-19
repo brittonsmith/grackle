@@ -8,7 +8,7 @@
 #include "grackle_chemistry_data.h"
 
 //Function definition.
-int writeRates(char language[50], chemistry_data *my_chemistry, chemistry_data_storage *my_rates) {
+int writeRates(char language[50], char runNumber[3], chemistry_data *my_chemistry, chemistry_data_storage *my_rates) {
     FILE *fp;
 
     //* Set up necessary folders and naming conventions.
@@ -20,7 +20,10 @@ int writeRates(char language[50], chemistry_data *my_chemistry, chemistry_data_s
     //* Write k1-k58 rates.
     char fileName1[1000] = " ";
     strcpy(fileName1, directory);
-    strcat(fileName1, "k1-k58_rates.txt");
+    strcat(fileName1, "k1-k58_rates");
+    strcat(fileName1, runNumber);
+    printf(fileName1);
+    strcat(fileName1, ".txt");
     fp = fopen(fileName1, "w");
     for (int line = 0; line < my_chemistry->NumberOfTemperatureBins; line++) {
         fprintf(fp, "%.12e,", my_rates->k1[line]); //0
@@ -62,7 +65,9 @@ int writeRates(char language[50], chemistry_data *my_chemistry, chemistry_data_s
     //*Write H2 formation heating terms.
     char fileName2[1000] = " ";
     strcpy(fileName2, directory);
-    strcat(fileName2, "H2formHeating_rates.txt");
+    strcat(fileName2, "H2formHeating_rates");
+    strcat(fileName2, runNumber);
+    strcat(fileName2, ".txt");
     fp = fopen(fileName2, "w");
     for (int line = 0; line < my_chemistry->NumberOfTemperatureBins; line++) {
         fprintf(fp, "%.12e,", my_rates->n_cr_n[line]);
@@ -75,7 +80,9 @@ int writeRates(char language[50], chemistry_data *my_chemistry, chemistry_data_s
     //*Write cooling and heating rates.
     char fileName3[1000] = " ";
     strcpy(fileName3, directory);
-    strcat(fileName3, "coolingAndHeating_rates.txt");
+    strcat(fileName3, "coolingAndHeating_rates");
+    strcat(fileName3, runNumber);
+    strcat(fileName3, ".txt");
     fp = fopen(fileName3, "w");
     for (int line = 0; line < my_chemistry->NumberOfTemperatureBins; line++) {
         fprintf(fp, "%.12e,", my_rates->ceHI[line]); //0
@@ -98,7 +105,9 @@ int writeRates(char language[50], chemistry_data *my_chemistry, chemistry_data_s
     //*Write molecular hydrogen cooling rates.
     char fileName4[1000] = " ";
     strcpy(fileName4, directory);
-    strcat(fileName4, "molecHydrogenCooling_rates.txt");
+    strcat(fileName4, "molecHydrogenCooling_rates");
+    strcat(fileName4, runNumber);
+    strcat(fileName4, ".txt");
     fp = fopen(fileName4, "w");
     for (int line = 0; line < my_chemistry->NumberOfTemperatureBins; line++) {
         fprintf(fp, "%.12e,", my_rates->hyd01k[line]);
@@ -116,7 +125,9 @@ int writeRates(char language[50], chemistry_data *my_chemistry, chemistry_data_s
     //*Write low density rates.
     char fileName5[1000] = " ";
     strcpy(fileName5, directory);
-    strcat(fileName5, "lowDensity_rates.txt");
+    strcat(fileName5, "lowDensity_rates");
+    strcat(fileName5, runNumber);
+    strcat(fileName5, ".txt");
     fp = fopen(fileName5, "w");
     for (int line = 0; line < my_chemistry->NumberOfTemperatureBins; line++) {
         fprintf(fp, "%.12e,", my_rates->GAHI[line]); //0
@@ -132,7 +143,9 @@ int writeRates(char language[50], chemistry_data *my_chemistry, chemistry_data_s
     //*Write k13dd.
     char fileName6[1000] = " ";
     strcpy(fileName6, directory);
-    strcat(fileName6, "k13dd.txt");
+    strcat(fileName6, "k13dd");
+    strcat(fileName6, runNumber);
+    strcat(fileName6, ".txt");
     fp = fopen(fileName6, "w");
     for (int line = 0; line < my_chemistry->NumberOfTemperatureBins; line++) {
         for (int col = 0; col < 14; col++) {
@@ -145,7 +158,9 @@ int writeRates(char language[50], chemistry_data *my_chemistry, chemistry_data_s
     //*Write h2dust.
     char fileName7[1000] = " ";
     strcpy(fileName7, directory);
-    strcat(fileName7, "h2dust.txt");
+    strcat(fileName7, "h2dust");
+    strcat(fileName7, runNumber);
+    strcat(fileName7, ".txt");
     fp = fopen(fileName7, "w");
     for (int line = 0; line < my_chemistry->NumberOfTemperatureBins; line++) {
         for (int col = 0; col < my_chemistry->NumberOfDustTemperatureBins; col++) {

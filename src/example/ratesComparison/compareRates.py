@@ -2,14 +2,10 @@ import datetime
 import math 
 
 #? Flags that can be set by the user to control terminal outputs for fortran-c comparison
-fortran_c = False
-showOOM = False
-showUniqueRates = True
+fortran_c = True
+showOOM = True
+showUniqueRates = False
 #?-----------------------------------------------
-
-#? Flags that can be set by the user to control python wrapper check
-checkPythonWrapper = True
-#?------------------------------------------------
 
 
 def test_fortran_c(fileNames):
@@ -106,23 +102,24 @@ def test_fortran_c(fileNames):
 
     f.close()
 
-#* Code for python wrapper check.                  
-def test_python_wrapper(fileNames):
-    """
-    This tests that the python wrapper is handling the initialised rate coefficients as expected
-    """
-
-
 #* Names of files which rates are stored in.
-fileNames = ["k1-k58_rates.txt", "H2formHeating_rates.txt", "coolingAndHeating_rates.txt", 
-             "molecHydrogenCooling_rates.txt", "lowDensity_rates.txt", "k13dd.txt", "h2dust.txt"]
+rateNames = ["k1-k58_rates", "H2formHeating_rates", "coolingAndHeating_rates", 
+             "molecHydrogenCooling_rates", "lowDensity_rates", "k13dd", "h2dust"]
 
-#* Run the code.
-if fortran_c:
-    test_fortran_c(fileNames)
-if checkPythonWrapper:
-    test_python_wrapper(fileNames)
+#* Test all parameter sets.
+testAll = False
+if testAll:
+    #* Iterate over all of the parameter sets.
+    for parameterSet in range(1,7):
+        fileNames = []
+        for rate in rateNames:
+            fileNames.append(rate + f"{parameterSet}.txt")
+        print(fileNames)
+        test_fortran_c(fileNames)
 
-                
-            
+#* Test specific files and parameter sets.      
+showUniqueRates = True
+specificNames = ["k1-k58_rates2.txt", "coolingAndHeating_rates2.txt", "h2dust2.txt"]
+test_fortran_c(specificNames)
+
 

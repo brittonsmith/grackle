@@ -70,7 +70,7 @@ extern void FORTRAN_NAME(calc_rates_g)(
 int calc_rates_g_c(chemistry_data *my_chemistry, chemistry_data_storage *my_rates, code_units *my_units, 
                 double co_length_units, double co_density_units);
 
-int writeRates(char language[50], chemistry_data *my_chemistry, chemistry_data_storage *my_rates);
+int writeRates(char language[50], char runNumber[3], chemistry_data *my_chemistry, chemistry_data_storage *my_rates);
 
 int _initialize_chemistry_data(chemistry_data *my_chemistry,
                                chemistry_data_storage *my_rates,
@@ -257,11 +257,150 @@ int _initialize_chemistry_data(chemistry_data *my_chemistry,
       POW(my_units->a_value * my_units->a_units, 3);
   }
 
+  //* If saveAllParamterResults = 1 then both fortran and C will be ran and all possible initialization formulae will be
+  //* used. Different variations of formulae are saved with different numbers at the end of their file names. There are
+  //* six different runs for both fortran and C.
+  int saveAllParameterResults = 1;
+  if (saveAllParameterResults == 1) {
+          int saveResults = 1;
+          for (int useFortran = 0; useFortran < 2; useFortran++) {
+                  for (int parameterSet = 1; parameterSet < 7; parameterSet ++){
+                        char runNumber[3] = "";
+                        char language[50] = "";
+                        if (parameterSet == 1) {
+                                strcpy(runNumber, "1");
+                                my_chemistry->CaseBRecombination = 0;
+                                my_chemistry->useSavin2004 = 1;
+                                my_chemistry->three_body_rate = 0;
+                                my_chemistry->useOmukai2000 = 1;
+                                my_chemistry->crg_coolExi = 1;
+                                my_chemistry->crg_collIon = 1;
+                                my_chemistry->crg_recomCool = 1;
+                                my_chemistry->crg_bremCool = 1;
+                                my_chemistry->useLique2015 == 1;
+                                my_chemistry->photoelectric_heating = -1;
+                        } else if (parameterSet == 2) {
+                                strcpy(runNumber, "2");
+                                my_chemistry->CaseBRecombination = 1;
+                                my_chemistry->useSavin2004 = 0;
+                                my_chemistry->three_body_rate = 1;
+                                my_chemistry->useOmukai2000 = 0;
+                                my_chemistry->crg_coolExi = 0;
+                                my_chemistry->crg_collIon = 0;
+                                my_chemistry->crg_recomCool = 0;
+                                my_chemistry->crg_bremCool = 0;
+                                my_chemistry->useLique2015 == 0;
+                                my_chemistry->photoelectric_heating = 2;
+                        } else if (parameterSet == 3) {
+                                strcpy(runNumber, "3");
+                                my_chemistry->CaseBRecombination = 0;
+                                my_chemistry->useSavin2004 = 1;
+                                my_chemistry->three_body_rate = 2;
+                                my_chemistry->useOmukai2000 = 1;
+                                my_chemistry->crg_coolExi = 1;
+                                my_chemistry->crg_collIon = 1;
+                                my_chemistry->crg_recomCool = 1;
+                                my_chemistry->crg_bremCool = 1;
+                                my_chemistry->useLique2015 == 1;
+                                my_chemistry->photoelectric_heating = -1;
+                        } else if (parameterSet == 4) {
+                                strcpy(runNumber, "4");
+                                my_chemistry->CaseBRecombination = 0;
+                                my_chemistry->useSavin2004 = 1;
+                                my_chemistry->three_body_rate = 3;
+                                my_chemistry->useOmukai2000 = 1;
+                                my_chemistry->crg_coolExi = 1;
+                                my_chemistry->crg_collIon = 1;
+                                my_chemistry->crg_recomCool = 1;
+                                my_chemistry->crg_bremCool = 1;
+                                my_chemistry->useLique2015 == 1;
+                                my_chemistry->photoelectric_heating = -1;
+                        } else if (parameterSet == 5) {
+                                strcpy(runNumber, "5");
+                                my_chemistry->CaseBRecombination = 0;
+                                my_chemistry->useSavin2004 = 1;
+                                my_chemistry->three_body_rate = 4;
+                                my_chemistry->useOmukai2000 = 1;
+                                my_chemistry->crg_coolExi = 1;
+                                my_chemistry->crg_collIon = 1;
+                                my_chemistry->crg_recomCool = 1;
+                                my_chemistry->crg_bremCool = 1;
+                                my_chemistry->useLique2015 == 1;
+                                my_chemistry->photoelectric_heating = -1;
+                        } else if (parameterSet == 6) {
+                                strcpy(runNumber, "6");
+                                my_chemistry->CaseBRecombination = 0;
+                                my_chemistry->useSavin2004 = 1;
+                                my_chemistry->three_body_rate = 5;
+                                my_chemistry->useOmukai2000 = 1;
+                                my_chemistry->crg_coolExi = 1;
+                                my_chemistry->crg_collIon = 1;
+                                my_chemistry->crg_recomCool = 1;
+                                my_chemistry->crg_bremCool = 1;
+                                my_chemistry->useLique2015 == 1;
+                                my_chemistry->photoelectric_heating = -1;
+                        } else {
+                                fprintf(stdout, "Invalid value for parameterSet encountered.");
+                                exit(0);
+                        }
+
+                        if (useFortran == 1) {
+                                //printf("\n Using fortran to calculate rates \n");
+                                strcpy(language, "fortran");
+                                FORTRAN_NAME(calc_rates_g)(
+                                &my_chemistry->primordial_chemistry, &my_chemistry->photoelectric_heating,
+                                &my_chemistry->h2_on_dust, &my_chemistry->dust_chemistry,
+                                &my_chemistry->NumberOfTemperatureBins, &my_units->a_value,
+                                &my_chemistry->TemperatureStart, &my_chemistry->TemperatureEnd,
+                                &my_chemistry->CaseBRecombination, &my_chemistry->three_body_rate,
+                                &co_length_units, &my_units->a_units, 
+                                &co_density_units, &my_units->time_units,
+                                my_rates->ceHI, my_rates->ceHeI, my_rates->ceHeII, my_rates->ciHI,
+                                        my_rates->ciHeI,
+                                my_rates->ciHeIS, my_rates->ciHeII, my_rates->reHII,
+                                        my_rates->reHeII1,
+                                my_rates->reHeII2, my_rates->reHeIII, my_rates->brem, &my_rates->comp, 
+                                &my_chemistry->photoelectric_heating_rate, &my_rates->gammah, my_rates->regr,
+                                &my_rates->gamma_isrf,
+                                my_rates->hyd01k, my_rates->h2k01, my_rates->vibh, my_rates->roth,
+                                        my_rates->rotl,
+                                my_rates->GP99LowDensityLimit, my_rates->GP99HighDensityLimit,
+                                        my_rates->HDlte, my_rates->HDlow, my_rates->cieco,
+                                my_rates->GAHI, my_rates->GAH2, my_rates->GAHe, my_rates->GAHp,
+                                my_rates->GAel, my_rates->H2LTE, my_rates->gas_grain, 
+                                my_rates->k1, my_rates->k2, my_rates->k3, my_rates->k4, my_rates->k5,
+                                        my_rates->k6, my_rates->k7, my_rates->k8, my_rates->k9, my_rates->k10,
+                                my_rates->k11, my_rates->k12, my_rates->k13, my_rates->k13dd, my_rates->k14,
+                                        my_rates->k15, my_rates->k16, my_rates->k17, my_rates->k18,
+                                my_rates->k19, my_rates->k20, my_rates->k21, my_rates->k22, my_rates->k23,
+                                my_rates->k50, my_rates->k51, my_rates->k52, my_rates->k53, my_rates->k54,
+                                        my_rates->k55, my_rates->k56, my_rates->k57, my_rates->k58,
+                                &my_chemistry->NumberOfDustTemperatureBins, &my_chemistry->DustTemperatureStart, 
+                                &my_chemistry->DustTemperatureEnd, my_rates->h2dust, 
+                                my_rates->n_cr_n, my_rates->n_cr_d1, my_rates->n_cr_d2, 
+                                &ioutput);
+                        } else { // Call c function to do the hard work.
+                                //printf("\n Using c to calculate rates \n");
+                                strcpy(language, "c");
+                                calc_rates_g_c(my_chemistry, my_rates, my_units, co_length_units, co_density_units);
+                        }
+                        if (saveResults == 1) {
+                                if (writeRates(language, runNumber, my_chemistry, my_rates) != 1) {
+                                        printf("\n Writing to results to file failed \n");
+                                }
+                        }
+                  }
+          }
+  }
+
+  
+
   //* Call calc_rates_g to compute rate tables. If use Fortran == 1 then it uses the legacy fortran code, if not it uses new c code.
   //* If saveResults = 1 then the results from calc_rates_g are saved in text files.
   int useFortran = 0;
   int saveResults = 0;
   /* Call FORTRAN routine to do the hard work. */
+  char runNumber[3] = "";
   char language[50] = "";
   if (useFortran == 1) {
         //printf("\n Using fortran to calculate rates \n");
@@ -304,7 +443,7 @@ int _initialize_chemistry_data(chemistry_data *my_chemistry,
         calc_rates_g_c(my_chemistry, my_rates, my_units, co_length_units, co_density_units);
   }
   if (saveResults == 1) {
-          if (writeRates(language, my_chemistry, my_rates) != 1) { //! Calling writeRates results in 'illegal hardware instruction' error.
+          if (writeRates(language, runNumber, my_chemistry, my_rates) != 1) {
                 printf("\n Writing to results to file failed \n");
           }
   }
