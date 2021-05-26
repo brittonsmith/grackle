@@ -22,6 +22,15 @@ cdef extern from "grackle_chemistry_data.h":
         int use_volumetric_heating_rate
         int use_specific_heating_rate
         int three_body_rate
+        int useSavin2004
+        int useOmukai2000
+        int useLique2015
+
+        int crg_coolExi
+        int crg_collIon
+        int crg_recomCool
+        int crg_bremCool
+
         int cie_cooling
         int h2_optical_depth_approximation
         int ih2co

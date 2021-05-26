@@ -1,4 +1,4 @@
-Ouptuts compared on --> 2021-05-19 17:24:00 
+Ouptuts compared on --> 2021-05-24 16:32:57 
 ______________________________ 
 DISCREPANCIES FOUND IN K1-K58_RATES6.TXT 
 ______________________________ 
@@ -926,11 +926,11 @@ Line 453:
  -Element 12. C value: 3.109065018611e+02. Fortran value 3.109065134783e+02. Discrepancy 3.7365572787065504e-08 
 Line 454: 
  -Element 12. C value: 3.049724448630e+02. Fortran value 3.049724562835e+02. Discrepancy 3.744764395523625e-08 
-Ouptuts compared on --> 2021-05-19 17:24:00 
+Ouptuts compared on --> 2021-05-24 16:32:58 
 ______________________________ 
 DISCREPANCIES FOUND IN H2FORMHEATING_RATES6.TXT 
 ______________________________ 
-Ouptuts compared on --> 2021-05-19 17:24:00 
+Ouptuts compared on --> 2021-05-24 16:32:58 
 ______________________________ 
 DISCREPANCIES FOUND IN COOLINGANDHEATING_RATES6.TXT 
 ______________________________ 
@@ -3334,11 +3334,11 @@ Line 599:
  -Element 8. C value: 1.315675340330e+33. Fortran value 1.315674969688e+33. Discrepancy 2.817123562925649e-07 
 Line 599: 
  -Element 11. C value: 1.508695160212e+35. Fortran value 1.508694793304e+35. Discrepancy 2.431955836847414e-07 
-Ouptuts compared on --> 2021-05-19 17:24:00 
+Ouptuts compared on --> 2021-05-24 16:32:58 
 ______________________________ 
 DISCREPANCIES FOUND IN MOLECHYDROGENCOOLING_RATES6.TXT 
 ______________________________ 
-Ouptuts compared on --> 2021-05-19 17:24:00 
+Ouptuts compared on --> 2021-05-24 16:32:58 
 ______________________________ 
 DISCREPANCIES FOUND IN LOWDENSITY_RATES6.TXT 
 ______________________________ 
@@ -5206,11 +5206,11 @@ Line 599:
  -Element 0. C value: 2.184337603392e+38. Fortran value 2.184338046216e+38. Discrepancy 2.0272686320527914e-07 
 Line 599: 
  -Element 3. C value: 7.058712901356e+38. Fortran value 7.058707572088e+38. Discrepancy 7.549914658007391e-07 
-Ouptuts compared on --> 2021-05-19 17:24:00 
+Ouptuts compared on --> 2021-05-24 16:32:58 
 ______________________________ 
 DISCREPANCIES FOUND IN K13DD6.TXT 
 ______________________________ 
-Ouptuts compared on --> 2021-05-19 17:24:00 
+Ouptuts compared on --> 2021-05-24 16:32:58 
 ______________________________ 
 DISCREPANCIES FOUND IN H2DUST6.TXT 
 ______________________________ 

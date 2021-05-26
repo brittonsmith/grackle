@@ -153,6 +153,48 @@ cdef class chemistry_data:
         def __set__(self, val):
             self.data.three_body_rate = val
 
+    property useOmukai2000:
+        def __get__(self):
+            return self.data.useOmukai2000
+        def __set__(self, val):
+            self.data.useOmukai2000 = val
+
+    property useSavin2004:
+        def __get__(self):
+            return self.data.useSavin2004
+        def __set__(self, val):
+            self.data.useSavin2004 = val
+
+    property useLique2015:
+        def __get__(self):
+            return self.data.useLique2015
+        def __set__(self, val):
+            self.data.useLique2015 = val
+
+    property crg_coolExi:
+        def __get__(self):
+            return self.data.crg_coolExi
+        def __set__(self, val):
+            self.data.crg_coolExi = val
+    
+    property crg_collIon:
+        def __get__(self):
+            return self.data.crg_collIon
+        def __set__(self, val):
+            self.data.crg_collIon = val
+
+    property crg_recomCool:
+        def __get__(self):
+            return self.data.crg_recomCool
+        def __set__(self, val):
+            self.data.crg_recomCool = val
+        
+    property crg_bremCool:
+        def __get__(self):
+            return self.data.crg_bremCool
+        def __set__(self, val):
+            self.data.crg_bremCool = val
+
     property cie_cooling:
         def __get__(self):
             return self.data.cie_cooling

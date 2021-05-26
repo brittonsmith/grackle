@@ -283,7 +283,7 @@ int _initialize_chemistry_data(chemistry_data *my_chemistry,
   //* If saveAllParamterResults = 1 then both fortran and C will be ran and all possible initialization formulae will be
   //* used. Different variations of formulae are saved with different numbers at the end of their file names. There are
   //* six different runs for both fortran and C.
-  int saveAllParameterResults = 1;
+  int saveAllParameterResults = 0;
   if (saveAllParameterResults == 1) {
           int saveResults = 1;
           for (int useFortran = 0; useFortran < 2; useFortran++) {
@@ -300,7 +300,7 @@ int _initialize_chemistry_data(chemistry_data *my_chemistry,
                                 my_chemistry->crg_collIon = 1;
                                 my_chemistry->crg_recomCool = 1;
                                 my_chemistry->crg_bremCool = 1;
-                                my_chemistry->useLique2015 == 1;
+                                my_chemistry->useLique2015 ==1;
                                 my_chemistry->photoelectric_heating = -1;
                         } else if (parameterSet == 2) {
                                 strcpy(runNumber, "2");
@@ -312,7 +312,7 @@ int _initialize_chemistry_data(chemistry_data *my_chemistry,
                                 my_chemistry->crg_collIon = 0;
                                 my_chemistry->crg_recomCool = 0;
                                 my_chemistry->crg_bremCool = 0;
-                                my_chemistry->useLique2015 == 0;
+                                my_chemistry->useLique2015 = 0;
                                 my_chemistry->photoelectric_heating = 2;
                         } else if (parameterSet == 3) {
                                 strcpy(runNumber, "3");
@@ -324,7 +324,7 @@ int _initialize_chemistry_data(chemistry_data *my_chemistry,
                                 my_chemistry->crg_collIon = 1;
                                 my_chemistry->crg_recomCool = 1;
                                 my_chemistry->crg_bremCool = 1;
-                                my_chemistry->useLique2015 == 1;
+                                my_chemistry->useLique2015 = 1;
                                 my_chemistry->photoelectric_heating = -1;
                         } else if (parameterSet == 4) {
                                 strcpy(runNumber, "4");
@@ -336,7 +336,7 @@ int _initialize_chemistry_data(chemistry_data *my_chemistry,
                                 my_chemistry->crg_collIon = 1;
                                 my_chemistry->crg_recomCool = 1;
                                 my_chemistry->crg_bremCool = 1;
-                                my_chemistry->useLique2015 == 1;
+                                my_chemistry->useLique2015 = 1;
                                 my_chemistry->photoelectric_heating = -1;
                         } else if (parameterSet == 5) {
                                 strcpy(runNumber, "5");
@@ -348,7 +348,7 @@ int _initialize_chemistry_data(chemistry_data *my_chemistry,
                                 my_chemistry->crg_collIon = 1;
                                 my_chemistry->crg_recomCool = 1;
                                 my_chemistry->crg_bremCool = 1;
-                                my_chemistry->useLique2015 == 1;
+                                my_chemistry->useLique2015 = 1;
                                 my_chemistry->photoelectric_heating = -1;
                         } else if (parameterSet == 6) {
                                 strcpy(runNumber, "6");
@@ -360,7 +360,7 @@ int _initialize_chemistry_data(chemistry_data *my_chemistry,
                                 my_chemistry->crg_collIon = 1;
                                 my_chemistry->crg_recomCool = 1;
                                 my_chemistry->crg_bremCool = 1;
-                                my_chemistry->useLique2015 == 1;
+                                my_chemistry->useLique2015 = 1;
                                 my_chemistry->photoelectric_heating = -1;
                         } else {
                                 fprintf(stdout, "Invalid value for parameterSet encountered.");
