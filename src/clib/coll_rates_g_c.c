@@ -221,8 +221,7 @@ void coll_rates_g_c(int temperatureBinIndex, double T, double kUnit, chemistry_d
 
         //k13.
         userRates->k13[temperatureBinIndex] = 1.0670825e-10*pow(T_ev, 2.012) \
-             / ( exp(4.463/T_ev) * pow((1.0 + 0.2472*T_ev), 3.512) ) \
-             / kUnit;       
+             / ( exp(4.463/T_ev) * pow((1.0 + 0.2472*T_ev), 3.512) );       
     } else {
         userRates->k11[temperatureBinIndex] = tiny;
         userRates->k12[temperatureBinIndex] = tiny;
