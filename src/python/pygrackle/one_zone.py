@@ -21,9 +21,10 @@ class OneZoneModel(abc.ABC):
     name = None
     verbose = True
 
-    def __init__(self, fc, data=None):
+    def __init__(self, fc, data=None, external_data=None):
         self.fc = fc
         self.data = data
+        self.external_data = external_data
 
     def calculate_timestep(self):
         self.fc.calculate_cooling_time()
@@ -44,6 +45,29 @@ class OneZoneModel(abc.ABC):
     @abc.abstractmethod
     def update_quantities(self):
         pass
+
+    def update_external_fields(self):
+        if self.external_data is None:
+            return
+
+        edata = self.external_data
+        time = edata["time"]
+        itime = np.digitize(self.current_time, time) - 1
+        if itime < 0 or itime >= time.size - 1:
+            return
+
+        efields = [field for field in edata if field != "time"]
+        new_fields = {}
+        for field in efields:
+            fdata = edata[field]
+            if fdata[itime] <= 0 or fdata[itime+1] <= 0:
+                new_fields[field] = fdata[itime]
+            else:
+                slope = (fdata[itime+1] - fdata[itime]) / (time[itime+1] - time[itime])
+                new_fields[field] = slope * (self.current_time - time[itime]) + fdata[itime]
+
+        for field in new_fields:
+            self.fc[field][:] = new_fields[field]
 
     def add_to_data(self):
         """
@@ -130,7 +154,7 @@ class OneZoneModel(abc.ABC):
             fc[field][:] *= factor
 
     def before_solve_chemistry(self):
-        pass
+        self.update_external_fields()
 
     def evolve(self):
         if self.data is None:
@@ -228,7 +252,7 @@ class ConstantEntropyModel(ConstantPressureModel):
 class FreeFallModel(OneZoneModel):
     name = "free-fall"
 
-    def __init__(self, fc, data=None,
+    def __init__(self, fc, data=None, external_data=None,
                  safety_factor=0.01, include_pressure=True,
                  final_time=None, final_density=None):
 
@@ -236,22 +260,28 @@ class FreeFallModel(OneZoneModel):
             raise RuntimeError(
                 "Must specify either final_time or final_density.")
 
-        super().__init__(fc, data=data)
+        super().__init__(fc, data=data, external_data=external_data)
         self.include_pressure = include_pressure
         self.safety_factor = safety_factor
         self.final_time = final_time
         self.final_density = final_density
 
-        # Set units of gravitational constant
-        my_chemistry = fc.chemistry_data
-        self.gravitational_constant = (
-            4.0 * np.pi * gravitational_constant_cgs *
-            my_chemistry.density_units * my_chemistry.time_units**2)
+    @property
+    def gravitational_constant(self):
+        """
+        Gravitational constant in internal units.
+        """
+        my_chemistry = self.fc.chemistry_data
+        val = 4.0 * np.pi * gravitational_constant_cgs * \
+          my_chemistry.density_units * my_chemistry.time_units**2
+        return val
 
-        # some constants for the analytical free-fall solution
-        self.freefall_time_constant = \
-          np.power(((32 * self.gravitational_constant) /
-                    (3. * np.pi)), 0.5)
+    @property
+    def freefall_constant(self):
+        """
+        Constant used in analytical free-fall solution.
+        """
+        return np.sqrt((32 * self.gravitational_constant) / (3. * np.pi))
 
     @property
     def finished(self):
@@ -267,10 +297,8 @@ class FreeFallModel(OneZoneModel):
 
     def calculate_timestep(self):
         fc = self.fc
-        dt_ff = self.safety_factor * \
-          np.power(((3. * np.pi) /
-                    (32 * self.gravitational_constant *
-                     fc["density"][0])), 0.5)
+        dt_ff = self.safety_factor / self.freefall_constant / \
+          np.sqrt(fc["density"][0])
 
         fc.calculate_cooling_time()
         dt_cool = self.safety_factor * \
@@ -291,7 +319,7 @@ class FreeFallModel(OneZoneModel):
         # calculate new density from altered free-fall solution
         new_density = np.power(
             (np.power(fc["density"][0], -0.5) -
-             (0.5 * self.freefall_time_constant * self.dt *
+             (0.5 * self.freefall_constant * self.dt *
               np.power((1 - force_factor), 0.5))), -2)
         factor = new_density / fc["density"][0]
 
@@ -299,7 +327,7 @@ class FreeFallModel(OneZoneModel):
 
         # now update energy for adiabatic heating from collapse
         fc["energy"][0] += (my_chemistry.Gamma - 1.) * fc["energy"][0] * \
-            self.freefall_time_constant * \
+            self.freefall_constant * \
             np.power(fc["density"][0], 0.5) * self.dt
 
     def calculate_collapse_factor(self):
@@ -348,14 +376,17 @@ class FreeFallModel(OneZoneModel):
 
 class FreeFallDarkMatterModel(FreeFallModel):
     name = "free-fall-dm"
+    use_dark_matter = True
 
     def calculate_timestep(self):
         fc = self.fc
 
-        density = fc["density"][0] + fc["dark_matter"][0]
-        dt_ff = self.safety_factor * \
-          np.sqrt((3. * np.pi) /
-                  (16 * self.gravitational_constant * density))
+        density = fc["density"][0]
+        if self.use_dark_matter:
+            density += fc["dark_matter"][0]
+
+        dt_ff = self.safety_factor / self.freefall_constant / \
+          np.sqrt(density)
 
         fc.calculate_cooling_time()
         dt_cool = self.safety_factor * \
@@ -373,17 +404,18 @@ class FreeFallDarkMatterModel(FreeFallModel):
         self.calculate_collapse_factor()
         force_factor = self.data["force_factor"][-1]
 
-        total_density = fc["density"][0] + fc["dark_matter"][0]
+        density = fc["density"][0]
+        if self.use_dark_matter:
+            density += fc["dark_matter"][0]
+
         factor = np.sqrt(1 - force_factor) * \
-          np.sqrt((16 * self.gravitational_constant * total_density) /
-                  (3 * np.pi)) * self.dt + 1
+          self.freefall_constant * np.sqrt(density) * self.dt + 1
 
         self.scale_density_fields(factor)
 
         # now update energy for adiabatic heating from collapse
         fc["energy"][0] += (my_chemistry.Gamma - 1.) * fc["energy"][0] * \
-            self.freefall_time_constant * \
-            np.power(fc["density"][0], 0.5) * self.dt
+            self.freefall_constant * np.sqrt(fc["density"][0]) * self.dt
 
 class MinihaloModel(FreeFallDarkMatterModel):
     name = "minihalo"
@@ -393,47 +425,21 @@ class MinihaloModel(FreeFallDarkMatterModel):
                  final_time=None, final_density=None):
 
         FreeFallDarkMatterModel.__init__(self, fc, data=data,
+                 external_data=external_data,
                  safety_factor=safety_factor,
                  include_pressure=include_pressure,
                  final_time=final_time,
                  final_density=final_density)
 
-        self.external_data = external_data
-
-    def update_quantities(self):
-        self.fc.calculate_cooling_time()
-        t_cool = self.fc["cooling_time"][0]
-        t_dyn = np.sqrt((3 * np.pi) / (16 * self.gravitational_constant * self.fc["density"][0]))
-        super().update_quantities()
-        # if t_cool > 0 or -t_cool >= t_dyn:
-        #     ConstantEntropyModel.update_quantities(self)
-        #     print ("Entropy")
-        # else:
-        #     FreeFallDarkMatterModel.update_quantities(self)
-        #     print ("Freefall")
-
-    def before_solve_chemistry(self):
-        self.update_external_fields()
-
-    def update_external_fields(self):
-        if self.external_data is None:
-            return
-
-        edata = self.external_data
-        time = edata["time"]
-        itime = np.digitize(self.current_time, time) - 1
-        if itime < 0 or itime >= time.size - 1:
-            return
-
-        efields = [field for field in edata if field != "time"]
-        new_fields = {}
-        for field in efields:
-            fdata = edata[field]
-            if fdata[itime] <= 0 or fdata[itime+1] <= 0:
-                new_fields[field] = fdata[itime]
-            else:
-                slope = (fdata[itime+1] - fdata[itime]) / (time[itime+1] - time[itime])
-                new_fields[field] = slope * (self.current_time - time[itime]) + fdata[itime]
-
-        for field in new_fields:
-            self.fc[field][:] = new_fields[field]
+    # def update_quantities(self):
+    #     self.fc.calculate_cooling_time()
+    #     t_cool = self.fc["cooling_time"][0]
+    #     t_dyn = np.sqrt((3 * np.pi) /
+    #                     (32 * self.gravitational_constant * self.fc["density"][0]))
+    #     super().update_quantities()
+    #     # if t_cool > 0 or -t_cool >= t_dyn:
+    #     #     ConstantEntropyModel.update_quantities(self)
+    #     #     print ("Entropy")
+    #     # else:
+    #     #     FreeFallDarkMatterModel.update_quantities(self)
+    #     #     print ("Freefall")
