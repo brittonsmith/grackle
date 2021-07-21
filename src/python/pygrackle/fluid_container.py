@@ -27,7 +27,8 @@ from pygrackle.utilities.misc import \
 from pygrackle.utilities.physical_constants import \
     mass_hydrogen_cgs
 
-_base_fluids = ["density", "metal", "dust", "dark_matter"]
+_base_fluids = ["density", "metal", "dust", "dark_matter",
+                "external_pressure"]
 _nd_fields   = ["energy",
                 "x-velocity", "y-velocity", "z-velocity",
                 "temperature", "dust_temperature", "pressure",

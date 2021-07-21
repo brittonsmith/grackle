@@ -404,11 +404,22 @@ class MinihaloModel(FreeFallModel):
         factor = np.sqrt(1 - force_factor) * \
           self.freefall_constant * np.sqrt(density) * self.dt + 1
 
+        fc.calculate_pressure()
+        pressure = fc["pressure"][0]
+
+        external_pressure = self.data["external_pressure"][-1]
+        if external_pressure > pressure:
+            T1 = self.data["temperature"][-1]
+            mu1 = self.data["mean_molecular_weight"][-1]
+            fc.calculate_temperature()
+            T2 = fc["temperature"][0]
+            fc.calculate_mean_molecular_weight()
+            mu2 = fc["mean_molecular_weight"][0]
+            factor = (external_pressure * T1 * mu2) / (T2 * mu1 * pressure)
+
         self.scale_density_fields(factor)
 
         # update energy assuming un-altered free-fall collapse
         e_factor = self.freefall_constant * np.sqrt(density) * self.dt + 1
-        fc.calculate_pressure()
-        pressure = (fc["pressure"][0] + self.data["pressure"][-1]) / 2
         de = - pressure * (1 - e_factor) / (e_factor * fc["density"][-1])
         fc["energy"][0] += de
