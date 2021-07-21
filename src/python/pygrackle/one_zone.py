@@ -340,6 +340,7 @@ class FreeFallModel(OneZoneModel):
 
         if not self.include_pressure:
             data["force_factor"].append(0)
+            return
 
         # Calculate the effective adiabatic index, dlog(p)/dlog(rho).
         density = data["density"]
@@ -374,28 +375,19 @@ class FreeFallModel(OneZoneModel):
 
         data["force_factor"].append(force_factor)
 
-class FreeFallDarkMatterModel(FreeFallModel):
-    name = "free-fall-dm"
-    use_dark_matter = True
+class MinihaloModel(FreeFallModel):
+    name = "minihalo"
 
-    def calculate_timestep(self):
-        fc = self.fc
+    def __init__(self, fc, data=None, external_data=None,
+                 safety_factor=0.01, include_pressure=True,
+                 final_time=None, final_density=None):
 
-        density = fc["density"][0]
-        if self.use_dark_matter:
-            density += fc["dark_matter"][0]
-
-        dt_ff = self.safety_factor / self.freefall_constant / \
-          np.sqrt(density)
-
-        fc.calculate_cooling_time()
-        dt_cool = self.safety_factor * \
-          np.abs(fc["cooling_time"][0])
-
-        dt = min(dt_ff, dt_cool)
-        dt = min(dt, self.remaining_time)
-        self.dt = dt
-        return dt
+        super().__init__(fc, data=data,
+                 external_data=external_data,
+                 safety_factor=safety_factor,
+                 include_pressure=include_pressure,
+                 final_time=final_time,
+                 final_density=final_density)
 
     def update_quantities(self):
         fc = self.fc
@@ -413,33 +405,13 @@ class FreeFallDarkMatterModel(FreeFallModel):
 
         self.scale_density_fields(factor)
 
+        # fc.calculate_pressure()
+        # pressure = (fc["pressure"][0] + self.data["pressure"][-1]) / 2
+        # de = pressure * (1 / self.data["density"][-1] - 1 / fc["density"][0])
+        # fc["energy"][0] += de
+
         # now update energy for adiabatic heating from collapse
-        fc["energy"][0] += (my_chemistry.Gamma - 1.) * fc["energy"][0] * \
-            self.freefall_constant * np.sqrt(fc["density"][0]) * self.dt
+        dedt = (my_chemistry.Gamma - 1.) * fc["energy"][0] * \
+            self.freefall_constant * np.sqrt(fc["density"][0])
 
-class MinihaloModel(FreeFallDarkMatterModel):
-    name = "minihalo"
-
-    def __init__(self, fc, data=None, external_data=None,
-                 safety_factor=0.01, include_pressure=False,
-                 final_time=None, final_density=None):
-
-        FreeFallDarkMatterModel.__init__(self, fc, data=data,
-                 external_data=external_data,
-                 safety_factor=safety_factor,
-                 include_pressure=include_pressure,
-                 final_time=final_time,
-                 final_density=final_density)
-
-    # def update_quantities(self):
-    #     self.fc.calculate_cooling_time()
-    #     t_cool = self.fc["cooling_time"][0]
-    #     t_dyn = np.sqrt((3 * np.pi) /
-    #                     (32 * self.gravitational_constant * self.fc["density"][0]))
-    #     super().update_quantities()
-    #     # if t_cool > 0 or -t_cool >= t_dyn:
-    #     #     ConstantEntropyModel.update_quantities(self)
-    #     #     print ("Entropy")
-    #     # else:
-    #     #     FreeFallDarkMatterModel.update_quantities(self)
-    #     #     print ("Freefall")
+        fc["energy"][0] += dedt * self.dt
