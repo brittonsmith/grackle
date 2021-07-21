@@ -406,6 +406,7 @@ class MinihaloModel(FreeFallModel):
 
         self.scale_density_fields(factor)
 
+        # update energy assuming un-altered free-fall collapse
         e_factor = self.freefall_constant * np.sqrt(density) * self.dt + 1
         fc.calculate_pressure()
         pressure = (fc["pressure"][0] + self.data["pressure"][-1]) / 2
