@@ -377,6 +377,7 @@ class FreeFallModel(OneZoneModel):
 
 class MinihaloModel(FreeFallModel):
     name = "minihalo"
+    use_dark_matter = False
 
     def __init__(self, fc, data=None, external_data=None,
                  safety_factor=0.01, include_pressure=True,
@@ -405,13 +406,8 @@ class MinihaloModel(FreeFallModel):
 
         self.scale_density_fields(factor)
 
-        # fc.calculate_pressure()
-        # pressure = (fc["pressure"][0] + self.data["pressure"][-1]) / 2
-        # de = pressure * (1 / self.data["density"][-1] - 1 / fc["density"][0])
-        # fc["energy"][0] += de
-
-        # now update energy for adiabatic heating from collapse
-        dedt = (my_chemistry.Gamma - 1.) * fc["energy"][0] * \
-            self.freefall_constant * np.sqrt(fc["density"][0])
-
-        fc["energy"][0] += dedt * self.dt
+        e_factor = self.freefall_constant * np.sqrt(density) * self.dt + 1
+        fc.calculate_pressure()
+        pressure = (fc["pressure"][0] + self.data["pressure"][-1]) / 2
+        de = - pressure * (1 - e_factor) / (e_factor * fc["density"][-1])
+        fc["energy"][0] += de
