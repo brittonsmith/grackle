@@ -384,9 +384,10 @@ class MinihaloModel(FreeFallModel):
     def __init__(self, fc, data=None, external_data=None,
                  safety_factor=0.01, include_pressure=True,
                  final_time=None, final_density=None,
-                 initial_radius=None):
+                 initial_radius=None, gas_mass=None):
 
         self.initial_radius = initial_radius
+        self.gas_mass = gas_mass
 
         super().__init__(fc, data=data,
                  external_data=external_data,
@@ -394,6 +395,31 @@ class MinihaloModel(FreeFallModel):
                  include_pressure=include_pressure,
                  final_time=final_time,
                  final_density=final_density)
+
+    @property
+    def finished(self):
+        if self.gas_mass is not None:
+            ### Bonnor-Ebert Mass constant
+            a = 1.67
+            b = (225 / (32 * np.sqrt(5 * np.pi))) * a**-1.5
+            fc = self.fc
+            fc.calculate_mean_molecular_weight()
+            fc.calculate_pressure()
+            p = fc["pressure"][0]
+            cs = np.sqrt(fc["mean_molecular_weight"][0] * p / fc["density"][0])
+            m_BE = (b * (cs**4 / self.gravitational_constant**1.5) * p**-0.5)
+            if self.gas_mass >= m_BE:
+                return True
+
+        if self.final_density is not None and \
+          self.fc["density"][0] >= self.final_density:
+            return True
+
+        if self.final_time is not None and \
+          self.current_time >= self.final_time:
+            return True
+
+        return False
 
     @property
     def current_radius(self):
