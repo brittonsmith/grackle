@@ -63,8 +63,10 @@ class OneZoneModel(abc.ABC):
             if fdata[itime] <= 0 or fdata[itime+1] <= 0:
                 new_fields[field] = fdata[itime]
             else:
+                fdata = np.log(fdata)
                 slope = (fdata[itime+1] - fdata[itime]) / (time[itime+1] - time[itime])
-                new_fields[field] = slope * (self.current_time - time[itime]) + fdata[itime]
+                new_fields[field] = \
+                  np.exp(slope * (self.current_time - time[itime]) + fdata[itime])
 
         for field in new_fields:
             self.fc[field][:] = new_fields[field]
@@ -314,21 +316,21 @@ class FreeFallModel(OneZoneModel):
         my_chemistry = fc.chemistry_data
 
         self.calculate_collapse_factor()
-        force_factor = self.data["force_factor"][-1]
+        force_factor = fc["force_factor"][0]
 
-        # calculate new density from altered free-fall solution
-        new_density = np.power(
-            (np.power(fc["density"][0], -0.5) -
-             (0.5 * self.freefall_constant * self.dt *
-              np.power((1 - force_factor), 0.5))), -2)
-        factor = new_density / fc["density"][0]
+        self.fc.calculate_pressure()
+        pressure = self.fc["pressure"][0]
+        density = self.fc["density"][0]
+        factor = np.sqrt(1 - force_factor) * \
+          self.freefall_constant * np.sqrt(density) * self.dt + 1
+
+        # update energy assuming un-altered free-fall collapse
+        e_factor = self.freefall_constant * np.sqrt(density) * self.dt + 1
 
         self.scale_density_fields(factor)
 
-        # now update energy for adiabatic heating from collapse
-        fc["energy"][0] += (my_chemistry.Gamma - 1.) * fc["energy"][0] * \
-            self.freefall_constant * \
-            np.power(fc["density"][0], 0.5) * self.dt
+        de = - pressure * (1 - e_factor) / (e_factor * density)
+        fc["energy"][0] += de
 
     def calculate_collapse_factor(self):
         """
@@ -339,7 +341,7 @@ class FreeFallModel(OneZoneModel):
         data = self.data
 
         if not self.include_pressure:
-            data["force_factor"].append(0)
+            self.fc["force_factor"] = np.array([0])
             return
 
         # Calculate the effective adiabatic index, dlog(p)/dlog(rho).
@@ -347,7 +349,7 @@ class FreeFallModel(OneZoneModel):
         pressure = data["pressure"]
 
         if len(pressure) < 3:
-            data["force_factor"].append(0)
+            self.fc["force_factor"] = np.array([0])
             return
 
         # compute dlog(p) / dlog(rho) using last two timesteps
@@ -373,7 +375,7 @@ class FreeFallModel(OneZoneModel):
         force_factor = max(force_factor, 0.0)
         force_factor = min(force_factor, 0.95)
 
-        data["force_factor"].append(force_factor)
+        self.fc["force_factor"] = np.array([force_factor])
 
 class MinihaloModel(FreeFallModel):
     name = "minihalo"
@@ -381,7 +383,10 @@ class MinihaloModel(FreeFallModel):
 
     def __init__(self, fc, data=None, external_data=None,
                  safety_factor=0.01, include_pressure=True,
-                 final_time=None, final_density=None):
+                 final_time=None, final_density=None,
+                 initial_radius=None):
+
+        self.initial_radius = initial_radius
 
         super().__init__(fc, data=data,
                  external_data=external_data,
@@ -390,36 +395,54 @@ class MinihaloModel(FreeFallModel):
                  final_time=final_time,
                  final_density=final_density)
 
+    @property
+    def current_radius(self):
+        return self.initial_radius * (self.data["density"][0] /
+                                      self.fc["density"][0])**(1/3)
+
     def update_quantities(self):
         fc = self.fc
         my_chemistry = fc.chemistry_data
 
-        self.calculate_collapse_factor()
-        force_factor = self.data["force_factor"][-1]
-
-        density = fc["density"][0]
-        if self.use_dark_matter:
-            density += fc["dark_matter"][0]
-
-        factor = np.sqrt(1 - force_factor) * \
-          self.freefall_constant * np.sqrt(density) * self.dt + 1
-
         fc.calculate_pressure()
+        fc.calculate_mean_molecular_weight()
+        density = fc["density"][0]
         pressure = fc["pressure"][0]
+        mu = fc["mean_molecular_weight"][0]
+        tcs = 2 * self.current_radius / np.sqrt(mu * pressure / density)
+        tff = 1 / (self.freefall_constant * np.sqrt(density))
 
-        external_pressure = self.data["external_pressure"][-1]
-        if external_pressure > pressure:
+        # free-fall
+        if (tff < tcs):
+            self.calculate_collapse_factor()
+            force_factor = fc["force_factor"][0]
+
+            total_density = density
+            if self.use_dark_matter:
+                total_density += fc["dark_matter"][0]
+
+            factor = np.sqrt(1 - force_factor) * \
+              self.freefall_constant * np.sqrt(total_density) * self.dt + 1
+
+            # update energy assuming un-altered free-fall collapse
+            e_factor = self.freefall_constant * np.sqrt(total_density) * self.dt + 1
+
+        # pressure-dominated
+        else:
+            external_pressure = self.data["external_pressure"][-1]
+            P1 = self.data["pressure"][-1]
             T1 = self.data["temperature"][-1]
             mu1 = self.data["mean_molecular_weight"][-1]
+            P2 = max(pressure, external_pressure)
             fc.calculate_temperature()
             T2 = fc["temperature"][0]
             fc.calculate_mean_molecular_weight()
             mu2 = fc["mean_molecular_weight"][0]
-            factor = (external_pressure * T1 * mu2) / (T2 * mu1 * pressure)
+            factor = (P2 * T1 * mu2) / (T2 * mu1 * P1)
+
+            e_factor = factor
 
         self.scale_density_fields(factor)
 
-        # update energy assuming un-altered free-fall collapse
-        e_factor = self.freefall_constant * np.sqrt(density) * self.dt + 1
-        de = - pressure * (1 - e_factor) / (e_factor * fc["density"][-1])
+        de = - pressure * (1 - e_factor) / (e_factor * density)
         fc["energy"][0] += de
