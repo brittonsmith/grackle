@@ -54,7 +54,6 @@ _parameter_map[EnzoDataset] = {
 
 _field_map = {
     'density': (('gas', 'density'), 'code_mass / code_length**3'),
-    'dark_matter': (('gas', 'dark_matter_density'), 'code_mass / code_length**3'),
     'HI': (('gas', 'H_p0_density'), 'code_mass / code_length**3'),
     'HII': (('gas', 'H_p1_density'), 'code_mass / code_length**3'),
     'HM': (('gas', 'H_m1_density'), 'code_mass / code_length**3'),
@@ -78,13 +77,14 @@ _field_map = {
     'RT_HeI_ionization_rate': (('gas', 'He_p0_ionization_rate'), '1 / code_time'),
     'RT_HeII_ionization_rate': (('gas', 'He_p1_ionization_rate'), '1 / code_time'),
     'RT_H2_dissociation_rate': (('gas', 'H2_p0_dissociation_rate'), '1 / code_time'),
-    'external_pressure': (('gas', 'external_pressure'), 'code_mass * code_velocity**2 / code_length**3')
+    'dark_matter': (('data', 'dark_matter_density'), 'code_mass / code_length**3'),
+    'external_pressure': (('data', 'external_pressure'), 'code_mass * code_velocity**2 / code_length**3'),
+    'metallicity': (('data', 'metallicity3'), ''),
 }
 
 def _get_needed_fields(my_chemistry):
     fields = \
-      ['density', 'energy', 'dark_matter',
-       'external_pressure'] + \
+      ['density', 'energy'] + \
       ['%s-velocity' % ax for ax in 'xyz']
     if my_chemistry.primordial_chemistry > 0:
         fields += ['HI', 'HII', 'HeI', 'HeII', 'HeIII', 'de']

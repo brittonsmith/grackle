@@ -6,8 +6,10 @@ OneZoneModel class
 
 import abc
 from collections import defaultdict
+import functools
 import numpy as np
-from unyt import unyt_array
+from unyt import unyt_array, unyt_quantity
+from unyt.unit_registry import UnitRegistry
 
 from pygrackle.utilities.physical_constants import \
     gravitational_constant_cgs, \
@@ -21,16 +23,56 @@ class OneZoneModel(abc.ABC):
     name = None
     verbose = True
 
-    def __init__(self, fc, data=None, external_data=None):
+    def __init__(self, fc, data=None, external_data=None,
+                 unit_registry=None):
         self.fc = fc
         self.data = data
+
+        if unit_registry is None:
+            unit_registry = UnitRegistry()
+        self.unit_registry = unit_registry
+
+        if external_data is None:
+            external_data = []
         self.external_data = external_data
+
+        for field in self.external_data:
+            if field not in self.fc.fields:
+                self.fc._setup_fluid(field)
+
+    _arr = None
+    @property
+    def arr(self):
+        """
+        Create a unyt_array using the Arbor's unit registry.
+        """
+        if self._arr is not None:
+            return self._arr
+        self._arr = functools.partial(unyt_array,
+                                      registry=self.unit_registry)
+        return self._arr
+
+    _quan = None
+    @property
+    def quan(self):
+        """
+        Create a unyt_quantity using the Arbor's unit registry.
+        """
+        if self._quan is not None:
+            return self._quan
+        self._quan = functools.partial(unyt_quantity,
+                                       registry=self.unit_registry)
+        return self._quan
 
     def calculate_timestep(self):
         self.fc.calculate_cooling_time()
         dt = self.safety_factor * np.abs(self.fc["cooling_time"][0])
         dt = min(dt, self.remaining_time)
         return dt
+
+    @property
+    def external_fields(self):
+        return [field for field in self.external_data if field != "time"]
 
     @property
     def remaining_time(self):
@@ -56,14 +98,13 @@ class OneZoneModel(abc.ABC):
         if itime < 0 or itime >= time.size - 1:
             return
 
-        efields = [field for field in edata if field != "time"]
         new_fields = {}
-        for field in efields:
+        for field in self.external_fields:
             fdata = edata[field]
-            if fdata[itime] <= 0 or fdata[itime+1] <= 0:
+            if fdata[itime] < 0 or fdata[itime+1] < 0:
                 new_fields[field] = fdata[itime]
             else:
-                fdata = np.log(fdata)
+                fdata = np.log(np.clip(fdata, a_min=1e-50, a_max=np.inf))
                 slope = (fdata[itime+1] - fdata[itime]) / (time[itime+1] - time[itime])
                 new_fields[field] = \
                   np.exp(slope * (self.current_time - time[itime]) + fdata[itime])
@@ -103,6 +144,9 @@ class OneZoneModel(abc.ABC):
             fc.calculate_dust_temperature()
             data["dust_temperature"].append(fc["dust_temperature"][0])
 
+        for field in self.external_fields:
+            data[field].append(fc[field][0])
+
     def finalize_data(self):
         """
         Turn lists of values into array with proper cgs units.
@@ -114,18 +158,18 @@ class OneZoneModel(abc.ABC):
         for field in data:
             if field in fc.density_fields:
                 data[field] = fc.chemistry_data.density_units * \
-                  unyt_array(data[field], "g/cm**3")
+                  self.arr(data[field], "g/cm**3")
             elif field == "energy":
                 data[field] = fc.chemistry_data.energy_units * \
-                  unyt_array(data[field], "erg/g")
+                  self.arr(data[field], "erg/g")
             elif field == "time":
                 data[field] = fc.chemistry_data.time_units * \
-                  unyt_array(data[field], "s")
+                  self.arr(data[field], "s")
             elif "temperature" in field:
-                data[field] = unyt_array(data[field], "K")
-            elif field == "pressure":
+                data[field] = self.arr(data[field], "K")
+            elif "pressure" in field:
                 data[field] = fc.chemistry_data.pressure_units * \
-                  unyt_array(data[field], "dyne/cm**2")
+                  self.arr(data[field], "dyne/cm**2")
             else:
                 data[field] = np.array(data[field])
         return data
@@ -156,11 +200,12 @@ class OneZoneModel(abc.ABC):
             fc[field][:] *= factor
 
     def before_solve_chemistry(self):
-        self.update_external_fields()
+        pass
 
     def evolve(self):
         if self.data is None:
             self.current_time = 0
+            self.update_external_fields()
             self.add_to_data()
         else:
             self.current_time = self.data["time"][-1]
@@ -168,6 +213,7 @@ class OneZoneModel(abc.ABC):
         self.print_status()
 
         while not self.finished:
+            self.update_external_fields()
             self.before_solve_chemistry()
 
             dt = self.calculate_timestep()
@@ -254,7 +300,8 @@ class ConstantEntropyModel(ConstantPressureModel):
 class FreeFallModel(OneZoneModel):
     name = "free-fall"
 
-    def __init__(self, fc, data=None, external_data=None,
+    def __init__(self, fc, data=None,
+                 external_data=None, unit_registry=None,
                  safety_factor=0.01, include_pressure=True,
                  final_time=None, final_density=None):
 
@@ -262,7 +309,8 @@ class FreeFallModel(OneZoneModel):
             raise RuntimeError(
                 "Must specify either final_time or final_density.")
 
-        super().__init__(fc, data=data, external_data=external_data)
+        super().__init__(fc, data=data, external_data=external_data,
+                         unit_registry=unit_registry)
         self.include_pressure = include_pressure
         self.safety_factor = safety_factor
         self.final_time = final_time
@@ -381,7 +429,8 @@ class MinihaloModel(FreeFallModel):
     name = "minihalo"
     use_dark_matter = False
 
-    def __init__(self, fc, data=None, external_data=None,
+    def __init__(self, fc, data=None,
+                 external_data=None, unit_registry=None,
                  safety_factor=0.01, include_pressure=True,
                  final_time=None, final_density=None,
                  initial_radius=None, gas_mass=None):
@@ -391,6 +440,7 @@ class MinihaloModel(FreeFallModel):
 
         super().__init__(fc, data=data,
                  external_data=external_data,
+                 unit_registry=unit_registry,
                  safety_factor=safety_factor,
                  include_pressure=include_pressure,
                  final_time=final_time,
@@ -420,6 +470,10 @@ class MinihaloModel(FreeFallModel):
             return True
 
         return False
+
+    def before_solve_chemistry(self):
+        if "metallicity" in self.external_fields:
+            self.fc["metal"][0] = self.fc["density"][0] * self.fc["metallicity"][0]
 
     @property
     def current_radius(self):

@@ -27,49 +27,15 @@ from pygrackle.utilities.misc import \
 from pygrackle.utilities.physical_constants import \
     mass_hydrogen_cgs
 
-_base_fluids = ["density", "metal", "dust", "dark_matter",
-                "external_pressure"]
-_nd_fields   = ["energy",
-                "x-velocity", "y-velocity", "z-velocity",
-                "temperature", "dust_temperature", "pressure",
-                "gamma", "cooling_time", "mu", "nH",
-                "mean_molecular_weight"]
-
-_fluid_names = {}
-_fluid_names[0] = _base_fluids
-_fluid_names[1] = _fluid_names[0] + \
-  ["HI", "HII", "HeI", "HeII", "HeIII", "de"]
-_fluid_names[2] = _fluid_names[1] + \
-  ["H2I", "H2II", "HM"]
-_fluid_names[3] = _fluid_names[2] + \
-  ["DI", "DII", "HDI"]
-
-_rad_trans_names = ['RT_heating_rate', 'RT_HI_ionization_rate',
-                    'RT_HeI_ionization_rate', 'RT_HeII_ionization_rate',
-                    'RT_H2_dissociation_rate']
-
-_extra_fields = {}
-_extra_fields[2] = ["H2_self_shielding_length"]
-_extra_fields[3] = _extra_fields[2] + []
-
 class FluidContainer(dict):
-    def __init__(self, chemistry_data, n_vals, dtype="float64",
-                 itype="int64"):
+    def __init__(self, chemistry_data, n_vals, dtype="float64"):
         super(FluidContainer, self).__init__()
         self.dtype = dtype
         self.chemistry_data = chemistry_data
         self.n_vals = n_vals
-        for fluid in _fluid_names[self.chemistry_data.primordial_chemistry] + \
-        _extra_fields.get(self.chemistry_data.primordial_chemistry, []) + \
-        _nd_fields:
-            self._setup_fluid(fluid)
-        if self.chemistry_data.use_radiative_transfer:
-            for fluid in _rad_trans_names:
-                self._setup_fluid(fluid)
 
-        for htype in ["specific", "volumetric"]:
-            if getattr(self.chemistry_data, "use_%s_heating_rate" % htype, 0):
-                self._setup_fluid("%s_heating_rate" % htype)
+        for field in self.fields:
+            self._setup_fluid(field)
 
     def _setup_fluid(self, fluid_name):
         self[fluid_name] = np.zeros(self.n_vals, self.dtype)
@@ -84,7 +50,47 @@ class FluidContainer(dict):
 
     @property
     def density_fields(self):
-        return _fluid_names[self.chemistry_data.primordial_chemistry]
+        fields = ["density"]
+        my_chemistry = self.chemistry_data
+        if my_chemistry.metal_cooling > 0:
+            fields.append("metal")
+        if my_chemistry.use_dust_density_field > 0:
+            fields.append("dust")
+        if my_chemistry.primordial_chemistry > 0:
+            fields += ["HI", "HII", "HeI", "HeII", "HeIII", "de"]
+        if my_chemistry.primordial_chemistry > 1:
+            fields += ["H2I", "H2II", "HM"]
+        if my_chemistry.primordial_chemistry > 2:
+            fields += ["DI", "DII", "HDI"]
+        return fields
+
+    @property
+    def fields(self):
+        fields = self.density_fields + \
+          ["energy",
+           "x-velocity", "y-velocity", "z-velocity",
+           "temperature", "dust_temperature", "pressure",
+           "gamma", "cooling_time", "mu", "nH",
+           "mean_molecular_weight"]
+
+        my_chemistry = self.chemistry_data
+
+        if my_chemistry.use_radiative_transfer:
+            fields += \
+              ["RT_heating_rate",
+               "RT_HI_ionization_rate",
+               "RT_HeI_ionization_rate",
+               "RT_HeII_ionization_rate",
+               "RT_H2_dissociation_rate"]
+
+        if my_chemistry.H2_self_shielding == 2:
+            fields.append("H2_self_shielding_length")
+
+        for htype in ["specific", "volumetric"]:
+            if getattr(my_chemistry, f"use_{htype}_heating_rate"):
+                fields.append(f"{htype}_heating_rate")
+
+        return fields
 
     def calculate_hydrogen_number_density(self):
         my_chemistry = self.chemistry_data
