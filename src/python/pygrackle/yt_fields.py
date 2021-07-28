@@ -161,6 +161,7 @@ def prepare_grackle_data(ds, parameters=None, sim_type=None, initialize=True):
     my_chemistry.a_units = 1 / (1 + ds.parameters.get('CosmologyInitialRedshift', 0))
     my_chemistry.a_value = 1 / (1 + ds.current_redshift) / my_chemistry.a_units
     my_chemistry.velocity_units = ds.velocity_unit.in_cgs().d
+
     if initialize:
         my_chemistry.initialize()
     ds.grackle_data = my_chemistry

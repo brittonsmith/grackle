@@ -490,7 +490,7 @@ class MinihaloModel(FreeFallModel):
                  safety_factor=0.01, include_pressure=True,
                  final_time=None, final_density=None,
                  initial_radius=None, gas_mass=None,
-                 event_trigger_fields=None):
+                 event_trigger_fields=None, cosmology=None):
 
         self.initial_radius = initial_radius
         self.gas_mass = gas_mass
@@ -503,6 +503,30 @@ class MinihaloModel(FreeFallModel):
                  final_time=final_time,
                  final_density=final_density,
                  event_trigger_fields=event_trigger_fields)
+
+        self.cosmology = cosmology
+        self.initialize_cosmology()
+
+    def initialize_cosmology(self):
+        if self.cosmology is None:
+            self.initial_redshift = None
+            self.initial_cosmo_time = None
+            return
+
+        my_chemistry = self.fc.chemistry_data
+        a_initial = my_chemistry.a_value * my_chemistry.a_units
+        self.initial_redshift = 1 / a_initial - 1
+        self.initial_cosmo_time = \
+          self.cosmology.t_from_z(self.initial_redshift).to('s').d / \
+          my_chemistry.time_units
+
+    @property
+    def current_redshift(self):
+        if self.cosmology is None:
+            return None
+        cosmo_time = self.fc.chemistry_data.time_units * \
+          (self.current_time + self.initial_cosmo_time)
+        return self.cosmology.z_from_t(cosmo_time)
 
     @property
     def finished(self):
@@ -519,6 +543,7 @@ class MinihaloModel(FreeFallModel):
     def before_solve_chemistry(self):
         if "metallicity" in self.external_fields:
             self.fc["metal"][0] = self.fc["density"][0] * self.fc["metallicity"][0]
+        self.fc.chemistry_data.override_redshift = self.current_redshift
 
     @property
     def current_radius(self):

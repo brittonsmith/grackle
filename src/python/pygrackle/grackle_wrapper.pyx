@@ -339,6 +339,12 @@ cdef class chemistry_data:
         def __set__(self, val):
             self.data.H2_self_shielding = val
 
+    property override_redshift:
+        def __get__(self):
+            return self.data.override_redshift
+        def __set__(self, val):
+            self.data.override_redshift = val
+
     property k24:
         def __get__(self):
             return self.rates.k24
