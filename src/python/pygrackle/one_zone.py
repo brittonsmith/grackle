@@ -22,9 +22,11 @@ class OneZoneModel(abc.ABC):
 
     name = None
     verbose = True
+    stopping_criteria = ()
 
     def __init__(self, fc, data=None, external_data=None,
                  unit_registry=None):
+
         self.fc = fc
         self.data = data
 
@@ -39,6 +41,8 @@ class OneZoneModel(abc.ABC):
         for field in self.external_data:
             if field not in self.fc.fields:
                 self.fc._setup_fluid(field)
+
+        self.check_stopping_criteria()
 
     _arr = None
     @property
@@ -63,6 +67,16 @@ class OneZoneModel(abc.ABC):
         self._quan = functools.partial(unyt_quantity,
                                        registry=self.unit_registry)
         return self._quan
+
+    def check_stopping_criteria(self):
+        canstop = False
+        for cri in self.stopping_criteria:
+            if getattr(self, cri, None) is not None:
+                canstop = True
+                break
+        if not canstop:
+            raise RuntimeError(
+                f"Must specify at least one stopping criteria: {self.stopping_criteria}.")
 
     def calculate_timestep(self):
         self.fc.calculate_cooling_time()
@@ -153,23 +167,30 @@ class OneZoneModel(abc.ABC):
         """
 
         fc = self.fc
+        my_chemistry = fc.chemistry_data
         data = self.data
 
         for field in data:
             if field in fc.density_fields:
-                data[field] = fc.chemistry_data.density_units * \
+                data[field] = my_chemistry.density_units * \
                   self.arr(data[field], "g/cm**3")
             elif field == "energy":
-                data[field] = fc.chemistry_data.energy_units * \
+                data[field] = my_chemistry.energy_units * \
                   self.arr(data[field], "erg/g")
-            elif field == "time":
-                data[field] = fc.chemistry_data.time_units * \
+            elif "time" in field:
+                data[field] = my_chemistry.time_units * \
                   self.arr(data[field], "s")
             elif "temperature" in field:
                 data[field] = self.arr(data[field], "K")
             elif "pressure" in field:
-                data[field] = fc.chemistry_data.pressure_units * \
+                data[field] = my_chemistry.pressure_units * \
                   self.arr(data[field], "dyne/cm**2")
+            elif "radius" in field:
+                data[field] = my_chemistry.length_units * \
+                  self.arr(data[field], "cm")
+            elif "mass" in field:
+                data[field] = my_chemistry.density_units * my_chemistry.length_units**3 * \
+                  self.arr(data[field], "g")
             else:
                 data[field] = np.array(data[field])
         return data
@@ -227,17 +248,15 @@ class OneZoneModel(abc.ABC):
             self.add_to_data()
 
 class CoolingModel(OneZoneModel):
+    stopping_criteria = ("final_time", "final_temperature")
+
     def __init__(self, fc, data=None, safety_factor=0.01,
                  final_time=None, final_temperature=None):
 
-        if final_time is None and final_temperature is None:
-            raise RuntimeError(
-                "Must specify either final_time or final_temperature.")
-
-        super().__init__(fc, data=data)
         self.safety_factor = safety_factor
         self.final_time = final_time
         self.final_temperature = final_temperature
+        super().__init__(fc, data=data)
 
     @property
     def finished(self):
@@ -299,22 +318,19 @@ class ConstantEntropyModel(ConstantPressureModel):
 
 class FreeFallModel(OneZoneModel):
     name = "free-fall"
+    stopping_criteria = ("final_time", "final_density")
 
     def __init__(self, fc, data=None,
                  external_data=None, unit_registry=None,
                  safety_factor=0.01, include_pressure=True,
                  final_time=None, final_density=None):
 
-        if final_time is None and final_density is None:
-            raise RuntimeError(
-                "Must specify either final_time or final_density.")
-
-        super().__init__(fc, data=data, external_data=external_data,
-                         unit_registry=unit_registry)
         self.include_pressure = include_pressure
         self.safety_factor = safety_factor
         self.final_time = final_time
         self.final_density = final_density
+        super().__init__(fc, data=data, external_data=external_data,
+                         unit_registry=unit_registry)
 
     @property
     def gravitational_constant(self):
@@ -322,7 +338,7 @@ class FreeFallModel(OneZoneModel):
         Gravitational constant in internal units.
         """
         my_chemistry = self.fc.chemistry_data
-        val = 4.0 * np.pi * gravitational_constant_cgs * \
+        val = gravitational_constant_cgs * \
           my_chemistry.density_units * my_chemistry.time_units**2
         return val
 
@@ -427,6 +443,7 @@ class FreeFallModel(OneZoneModel):
 
 class MinihaloModel(FreeFallModel):
     name = "minihalo"
+    stopping_criteria = ("final_time", "final_density", "gas_mass")
     use_dark_matter = False
 
     def __init__(self, fc, data=None,
@@ -448,26 +465,13 @@ class MinihaloModel(FreeFallModel):
 
     @property
     def finished(self):
+        if super().finished:
+            return True
+
         if self.gas_mass is not None:
-            ### Bonnor-Ebert Mass constant
-            a = 1.67
-            b = (225 / (32 * np.sqrt(5 * np.pi))) * a**-1.5
-            fc = self.fc
-            fc.calculate_mean_molecular_weight()
-            fc.calculate_pressure()
-            p = fc["pressure"][0]
-            cs = np.sqrt(fc["mean_molecular_weight"][0] * p / fc["density"][0])
-            m_BE = (b * (cs**4 / self.gravitational_constant**1.5) * p**-0.5)
+            m_BE = self.calculate_bonnor_ebert_mass()
             if self.gas_mass >= m_BE:
                 return True
-
-        if self.final_density is not None and \
-          self.fc["density"][0] >= self.final_density:
-            return True
-
-        if self.final_time is not None and \
-          self.current_time >= self.final_time:
-            return True
 
         return False
 
@@ -484,20 +488,18 @@ class MinihaloModel(FreeFallModel):
         fc = self.fc
         my_chemistry = fc.chemistry_data
 
+        tcs = self.calculate_sound_crossing_time()
+        tff = self.calculate_free_fall_time()
+
         fc.calculate_pressure()
-        fc.calculate_mean_molecular_weight()
-        density = fc["density"][0]
         pressure = fc["pressure"][0]
-        mu = fc["mean_molecular_weight"][0]
-        tcs = 2 * self.current_radius / np.sqrt(mu * pressure / density)
-        tff = 1 / (self.freefall_constant * np.sqrt(density))
 
         # free-fall
         if (tff < tcs):
             self.calculate_collapse_factor()
             force_factor = fc["force_factor"][0]
 
-            total_density = density
+            total_density = fc["density"][0]
             if self.use_dark_matter:
                 total_density += fc["dark_matter"][0]
 
@@ -510,6 +512,7 @@ class MinihaloModel(FreeFallModel):
         # pressure-dominated
         else:
             external_pressure = self.data["external_pressure"][-1]
+
             P1 = self.data["pressure"][-1]
             T1 = self.data["temperature"][-1]
             mu1 = self.data["mean_molecular_weight"][-1]
@@ -524,5 +527,72 @@ class MinihaloModel(FreeFallModel):
 
         self.scale_density_fields(factor)
 
-        de = - pressure * (1 - e_factor) / (e_factor * density)
+        de = - pressure * (1 - e_factor) / (e_factor * self.fc["density"][0])
         fc["energy"][0] += de
+
+    def calculate_sound_speed(self):
+        fc = self.fc
+        my_chemistry = fc.chemistry_data
+
+        density = fc["density"][0]
+        fc.calculate_pressure()
+        pressure = fc["pressure"][0]
+        fc.calculate_gamma()
+        gamma = fc["gamma"][0]
+
+        return np.sqrt(gamma * pressure / density)
+
+    def calculate_sound_crossing_time(self):
+        cs = self.calculate_sound_speed()
+        return 2 * self.current_radius * \
+          self.fc.chemistry_data.a_value / cs
+
+    def calculate_free_fall_time(self):
+        density = self.fc["density"][0]
+        if self.use_dark_matter:
+            density += self.data["dark_matter"][-1]
+        return 1 / (self.freefall_constant * np.sqrt(density))
+
+    def calculate_bonnor_ebert_mass(self):
+        ### Bonnor-Ebert Mass constant
+        a = 1.67
+        b = (225 / (32 * np.sqrt(5 * np.pi))) * a**-1.5
+
+        fc = self.fc
+        my_chemistry = fc.chemistry_data
+
+        fc.calculate_pressure()
+        pressure = fc["pressure"][0]
+
+        # Convert to CGS because I am tired of
+        # messing up cosmological units.
+        cs_cgs = self.calculate_sound_speed() * \
+          my_chemistry.velocity_units
+        G = gravitational_constant_cgs
+        pressure_cgs = pressure * my_chemistry.pressure_units
+        m_BE = (b * (cs_cgs**4 / G**1.5) * pressure_cgs**-0.5)
+
+        mass_units = my_chemistry.density_units * \
+          my_chemistry.length_units**3
+        return m_BE / mass_units
+
+    def add_to_data(self):
+        super().add_to_data()
+
+        fc = self.fc
+
+        t_ff = self.calculate_free_fall_time()
+        self.data["free_fall_time"].append(t_ff)
+
+        t_cs = self.calculate_sound_crossing_time()
+        self.data["sound_crossing_time"].append(t_cs)
+
+        # Turn off CMB floor to calculate cooling time
+        cmb = fc.chemistry_data.cmb_temperature_floor
+        fc.chemistry_data.cmb_temperature_floor = 0
+        fc.calculate_cooling_time()
+        self.data["cooling_time"].append(fc["cooling_time"][0])
+        fc.chemistry_data.cmb_temperature_floor = cmb
+
+        m_BE = self.calculate_bonnor_ebert_mass()
+        self.data["mass_BE"].append(m_BE)
