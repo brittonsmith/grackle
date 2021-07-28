@@ -25,7 +25,7 @@ class OneZoneModel(abc.ABC):
     stopping_criteria = ()
 
     def __init__(self, fc, data=None, external_data=None,
-                 unit_registry=None):
+                 unit_registry=None, event_trigger_fields=None):
 
         self.fc = fc
         self.data = data
@@ -43,6 +43,27 @@ class OneZoneModel(abc.ABC):
                 self.fc._setup_fluid(field)
 
         self.check_stopping_criteria()
+        self.prepare_event_times(event_trigger_fields)
+
+    def prepare_event_times(self, fields):
+        """
+        Create a list of times to make sure we hit.
+
+        These fields need to be in the external data.
+        """
+
+        self.events = []
+        if fields is None:
+            return
+
+        for field in fields:
+            data = self.external_data[field]
+            onoff = np.where(~((data[:-1] > 0) ^ (data[1:] <= 0)))[0] + 1
+            for t in self.external_data["time"][onoff]:
+                if t not in self.events:
+                    self.events.append(t)
+
+        self.events = np.array(self.events)
 
     _arr = None
     @property
@@ -90,9 +111,25 @@ class OneZoneModel(abc.ABC):
 
     @property
     def remaining_time(self):
+        """
+        Return time to nearest event or final time.
+        """
+        if len(self.events):
+            upcoming = self.events > self.current_time
+            if not upcoming.any():
+                t_next = np.inf
+            else:
+                t_next = (self.events[upcoming] - self.current_time).min()
+        else:
+            t_next = np.inf
+
         if self.final_time is None:
-            return np.inf
-        return self.final_time - self.current_time
+            final_time = np.inf
+        else:
+            final_fime = self.final_time
+        rt = final_time - self.current_time
+
+        return min(t_next, rt)
 
     @abc.abstractproperty
     def finished(self):
@@ -323,14 +360,16 @@ class FreeFallModel(OneZoneModel):
     def __init__(self, fc, data=None,
                  external_data=None, unit_registry=None,
                  safety_factor=0.01, include_pressure=True,
-                 final_time=None, final_density=None):
+                 final_time=None, final_density=None,
+                 event_trigger_fields=None):
 
         self.include_pressure = include_pressure
         self.safety_factor = safety_factor
         self.final_time = final_time
         self.final_density = final_density
         super().__init__(fc, data=data, external_data=external_data,
-                         unit_registry=unit_registry)
+                         unit_registry=unit_registry,
+                         event_trigger_fields=event_trigger_fields)
 
     @property
     def gravitational_constant(self):
@@ -450,7 +489,8 @@ class MinihaloModel(FreeFallModel):
                  external_data=None, unit_registry=None,
                  safety_factor=0.01, include_pressure=True,
                  final_time=None, final_density=None,
-                 initial_radius=None, gas_mass=None):
+                 initial_radius=None, gas_mass=None,
+                 event_trigger_fields=None):
 
         self.initial_radius = initial_radius
         self.gas_mass = gas_mass
@@ -461,7 +501,8 @@ class MinihaloModel(FreeFallModel):
                  safety_factor=safety_factor,
                  include_pressure=include_pressure,
                  final_time=final_time,
-                 final_density=final_density)
+                 final_density=final_density,
+                 event_trigger_fields=event_trigger_fields)
 
     @property
     def finished(self):
