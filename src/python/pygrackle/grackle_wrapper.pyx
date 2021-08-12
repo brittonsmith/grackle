@@ -23,9 +23,11 @@ cdef class chemistry_data:
     cdef c_chemistry_data data
     cdef c_chemistry_data_storage rates
     cdef c_code_units units
+    cdef object data_file_path
 
     def __cinit__(self):
         self.data = _set_default_chemistry_parameters()
+        self.data_file_path = None
 
     def initialize(self):
         ret =  _initialize_chemistry_data(&self.data, &self.rates, &self.units)
@@ -77,11 +79,19 @@ cdef class chemistry_data:
 
     property grackle_data_file:
         def __get__(self):
-            return self.data.grackle_data_file
+            # ensure that the underlying bytearray can't be modified (if it
+            # grows/shrinks the `char*` allocation can be invalidated)
+            return bytes(self.data.grackle_data_file)
         def __set__(self, val):
-            if isinstance(val, str):
-                val = val.encode('utf-8')
-            self.data.grackle_data_file = val
+            # when Cython converts a bytearray to `char*`, the lifetime of the
+            # `char*` allocation is tied to the lifetime of the original
+            # bytearray object. We need to make sure that the bytearray object
+            # isn't garbage collected for as long as the `char*` allocation is
+            # in use. We do this by storing the bytearray as an attribute
+            self.data_file_path = val
+            if isinstance(self.data_file_path, str):
+                self.data_file_path = self.data_file_path.encode('utf-8')
+            self.data.grackle_data_file = self.data_file_path
 
     property cmb_temperature_floor:
         def __get__(self):
@@ -329,6 +339,12 @@ cdef class chemistry_data:
         def __set__(self, val):
             self.data.H2_self_shielding = val
 
+    property override_redshift:
+        def __get__(self):
+            return self.data.override_redshift
+        def __set__(self, val):
+            self.data.override_redshift = val
+
     property k24:
         def __get__(self):
             return self.rates.k24
@@ -496,6 +512,10 @@ def solve_chemistry(fc, my_dt):
     my_fields.metal_density = get_field(fc, "metal")
     my_fields.dust_density = get_field(fc, "dust")
     my_fields.RT_heating_rate = get_field(fc, "RT_heating_rate")
+    my_fields.RT_HI_ionization_rate = get_field(fc, "RT_HI_ionization_rate")
+    my_fields.RT_HeI_ionization_rate = get_field(fc, "RT_HeI_ionization_rate")
+    my_fields.RT_HeII_ionization_rate = get_field(fc, "RT_HeII_ionization_rate")
+    my_fields.RT_H2_dissociation_rate = get_field(fc, "RT_H2_dissociation_rate")
     my_fields.volumetric_heating_rate = get_field(fc, "volumetric_heating_rate")
     my_fields.specific_heating_rate = get_field(fc, "specific_heating_rate")
 
@@ -546,6 +566,10 @@ def calculate_cooling_time(fc):
     my_fields.metal_density = get_field(fc, "metal")
     my_fields.dust_density = get_field(fc, "dust")
     my_fields.RT_heating_rate = get_field(fc, "RT_heating_rate")
+    my_fields.RT_HI_ionization_rate = get_field(fc, "RT_HI_ionization_rate")
+    my_fields.RT_HeI_ionization_rate = get_field(fc, "RT_HeI_ionization_rate")
+    my_fields.RT_HeII_ionization_rate = get_field(fc, "RT_HeII_ionization_rate")
+    my_fields.RT_H2_dissociation_rate = get_field(fc, "RT_H2_dissociation_rate")
     my_fields.volumetric_heating_rate = get_field(fc, "volumetric_heating_rate")
     my_fields.specific_heating_rate = get_field(fc, "specific_heating_rate")
     cdef gr_float *cooling_time = get_field(fc, "cooling_time")
@@ -597,6 +621,10 @@ def calculate_gamma(fc):
     my_fields.metal_density = get_field(fc, "metal")
     my_fields.dust_density = get_field(fc, "dust")
     my_fields.RT_heating_rate = get_field(fc, "RT_heating_rate")
+    my_fields.RT_HI_ionization_rate = get_field(fc, "RT_HI_ionization_rate")
+    my_fields.RT_HeI_ionization_rate = get_field(fc, "RT_HeI_ionization_rate")
+    my_fields.RT_HeII_ionization_rate = get_field(fc, "RT_HeII_ionization_rate")
+    my_fields.RT_H2_dissociation_rate = get_field(fc, "RT_H2_dissociation_rate")
     my_fields.volumetric_heating_rate = get_field(fc, "volumetric_heating_rate")
     my_fields.specific_heating_rate = get_field(fc, "specific_heating_rate")
     cdef gr_float *gamma = get_field(fc, "gamma")
@@ -648,6 +676,10 @@ def calculate_pressure(fc):
     my_fields.metal_density = get_field(fc, "metal")
     my_fields.dust_density = get_field(fc, "dust")
     my_fields.RT_heating_rate = get_field(fc, "RT_heating_rate")
+    my_fields.RT_HI_ionization_rate = get_field(fc, "RT_HI_ionization_rate")
+    my_fields.RT_HeI_ionization_rate = get_field(fc, "RT_HeI_ionization_rate")
+    my_fields.RT_HeII_ionization_rate = get_field(fc, "RT_HeII_ionization_rate")
+    my_fields.RT_H2_dissociation_rate = get_field(fc, "RT_H2_dissociation_rate")
     my_fields.volumetric_heating_rate = get_field(fc, "volumetric_heating_rate")
     my_fields.specific_heating_rate = get_field(fc, "specific_heating_rate")
     cdef gr_float *pressure = get_field(fc, "pressure")
@@ -699,6 +731,10 @@ def calculate_temperature(fc):
     my_fields.metal_density = get_field(fc, "metal")
     my_fields.dust_density = get_field(fc, "dust")
     my_fields.RT_heating_rate = get_field(fc, "RT_heating_rate")
+    my_fields.RT_HI_ionization_rate = get_field(fc, "RT_HI_ionization_rate")
+    my_fields.RT_HeI_ionization_rate = get_field(fc, "RT_HeI_ionization_rate")
+    my_fields.RT_HeII_ionization_rate = get_field(fc, "RT_HeII_ionization_rate")
+    my_fields.RT_H2_dissociation_rate = get_field(fc, "RT_H2_dissociation_rate")
     my_fields.volumetric_heating_rate = get_field(fc, "volumetric_heating_rate")
     my_fields.specific_heating_rate = get_field(fc, "specific_heating_rate")
     cdef gr_float *temperature = get_field(fc, "temperature")
@@ -750,6 +786,10 @@ def calculate_dust_temperature(fc):
     my_fields.metal_density = get_field(fc, "metal")
     my_fields.dust_density = get_field(fc, "dust")
     my_fields.RT_heating_rate = get_field(fc, "RT_heating_rate")
+    my_fields.RT_HI_ionization_rate = get_field(fc, "RT_HI_ionization_rate")
+    my_fields.RT_HeI_ionization_rate = get_field(fc, "RT_HeI_ionization_rate")
+    my_fields.RT_HeII_ionization_rate = get_field(fc, "RT_HeII_ionization_rate")
+    my_fields.RT_H2_dissociation_rate = get_field(fc, "RT_H2_dissociation_rate")
     my_fields.volumetric_heating_rate = get_field(fc, "volumetric_heating_rate")
     my_fields.specific_heating_rate = get_field(fc, "specific_heating_rate")
     cdef gr_float *dust_temperature = get_field(fc, "dust_temperature")

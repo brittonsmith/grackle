@@ -42,7 +42,7 @@
      &                metPar1, metPar2, metPar3, metPar4, metPar5,
      &                metDataSize, metCooling, metHeating, clnew,
      &                iVheat, iMheat, Vheat, Mheat,
-     &                iisrffield, isrf_habing,
+     &                iisrffield, isrf_habing, myz,
      &                itmask)
 
 !  SOLVE RADIATIVE COOLING/HEATING EQUATIONS
@@ -79,7 +79,7 @@
 
       real*8  aye, temstart, temend, z_solar, fgr,
      &        utem, uxyz, uaye, urho, utim,
-     &        gamma, fh, clEleFra
+     &        gamma, fh, clEleFra, myz
       R_PREC  d(in,jn,kn),    e(in,jn,kn),
      &        u(in,jn,kn),    v(in,jn,kn),     w(in,jn,kn),
      &        de(in,jn,kn),   HI(in,jn,kn),   HII(in,jn,kn),
@@ -193,7 +193,11 @@
       xbase1   = uxyz/(aye*uaye)    ! uxyz is [x]*a      = [x]*[a]*a'        '
       dbase1   = urho*(aye*uaye)**3 ! urho is [dens]/a^3 = [dens]/([a]*a')^3 '
       coolunit = (uaye**5 * xbase1**2 * mh**2) / (tbase1**3 * dbase1)
-      zr       = 1._DKIND/(aye*uaye) - 1._DKIND
+      if (myz .gt. -1) then
+         zr = myz
+      else
+         zr = 1._DKIND/(aye*uaye) - 1._DKIND
+      endif
       fudge    = 1._DKIND
       iradfield = -1
 

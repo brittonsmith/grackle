@@ -326,7 +326,7 @@
                edot_met(i) = edot_met(i) * cl_e_frac(i)
             endif
 
-            edot(i) = edot(i) + (edot_met(i) * rhoH(i) * d(i,j,k))
+            edot(i) = edot(i) + (edot_met(i) * rhoH(i) * rhoH(i))
 
          end if
       enddo
