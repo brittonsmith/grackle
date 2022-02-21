@@ -126,7 +126,8 @@ class OneZoneModel(abc.ABC):
         if self.final_time is None:
             final_time = np.inf
         else:
-            final_fime = self.final_time
+            final_time = self.final_time
+
         rt = final_time - self.current_time
 
         return min(t_next, rt)
