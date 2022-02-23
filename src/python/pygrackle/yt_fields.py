@@ -80,6 +80,7 @@ _field_map = {
     'dark_matter': (('data', 'dark_matter_density'), 'code_mass / code_length**3'),
     'external_pressure': (('data', 'external_pressure'), 'code_mass * code_velocity**2 / code_length**3'),
     'metallicity': (('data', 'metallicity3'), ''),
+    'turbulent_velocity': (('data', 'turbulent_velocity'), 'code_velocity')
 }
 
 def _get_needed_fields(my_chemistry):

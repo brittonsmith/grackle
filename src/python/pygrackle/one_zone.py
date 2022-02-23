@@ -229,6 +229,9 @@ class OneZoneModel(abc.ABC):
             elif "mass" in field:
                 data[field] = my_chemistry.density_units * my_chemistry.length_units**3 * \
                   self.arr(data[field], "g")
+            elif "velocity" in field:
+                data[field] = my_chemistry.velocity_units * \
+                  self.arr(data[field], "cm/s")
             else:
                 data[field] = np.array(data[field])
         return data
@@ -491,10 +494,12 @@ class MinihaloModel(FreeFallModel):
                  safety_factor=0.01, include_pressure=True,
                  final_time=None, final_density=None,
                  initial_radius=None, gas_mass=None,
+                 include_turbulence=True,
                  event_trigger_fields=None, cosmology=None):
 
         self.initial_radius = initial_radius
         self.gas_mass = gas_mass
+        self.include_turbulence = include_turbulence
 
         super().__init__(fc, data=data,
                  external_data=external_data,
@@ -607,7 +612,12 @@ class MinihaloModel(FreeFallModel):
         fc.calculate_gamma()
         gamma = fc["gamma"][0]
 
-        return np.sqrt(gamma * pressure / density)
+        cs = np.sqrt(gamma * pressure / density)
+        if self.include_turbulence:
+            v_turb = self.data["turbulent_velocity"][-1]
+            cs = np.sqrt(cs**2 + v_turb**2)
+
+        return cs
 
     def calculate_sound_crossing_time(self):
         cs = self.calculate_sound_speed()
@@ -633,8 +643,13 @@ class MinihaloModel(FreeFallModel):
 
         # Convert to CGS because I am tired of
         # messing up cosmological units.
+        # Ignore turbulent velocity for cs in BE mass.
+        include_turbulence = self.include_turbulence
+        self.include_turbulence = False
         cs_cgs = self.calculate_sound_speed() * \
           my_chemistry.velocity_units
+        self.include_turbulence = include_turbulence
+
         G = gravitational_constant_cgs
         pressure_cgs = pressure * my_chemistry.pressure_units
         m_BE = (b * (cs_cgs**4 / G**1.5) * pressure_cgs**-0.5)
