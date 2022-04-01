@@ -141,7 +141,7 @@ class OneZoneModel(abc.ABC):
         pass
 
     def update_external_fields(self):
-        if self.external_data is None:
+        if not self.external_data:
             return
 
         edata = self.external_data
