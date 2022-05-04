@@ -78,7 +78,7 @@ _field_map = {
     'RT_HeII_ionization_rate': (('gas', 'He_p1_ionization_rate'), '1 / code_time'),
     'RT_H2_dissociation_rate': (('gas', 'H2_p0_dissociation_rate'), '1 / code_time'),
     'dark_matter': (('data', 'dark_matter_density'), 'code_mass / code_length**3'),
-    'external_pressure': (('data', 'external_pressure'), 'code_mass * code_velocity**2 / code_length**3'),
+    'hydrostatic_pressure': (('data', 'hydrostatic_pressure'), 'code_mass * code_velocity**2 / code_length**3'),
     'metallicity': (('data', 'metallicity3'), ''),
     'turbulent_velocity': (('data', 'turbulent_velocity'), 'code_velocity')
 }
