@@ -518,7 +518,26 @@ class MinihaloModel(FreeFallModel):
         self.initialize_cosmology()
 
     def prepare_event_times(self, fields):
+        """
+        Create a list of times to make sure we hit.
+
+        These fields need to be in the external data.
+        """
+
         self.events = []
+        if fields is None:
+            return
+
+        for field in fields:
+            data = self.external_data[field]
+            offon = ((data[:-1,:] <= 0) & (data[1:,:] > 0)).sum(axis=1)
+            onoff = ((data[:-1,:] > 0) & (data[1:,:] <= 0)).sum(axis=1)
+            ievent = np.where(offon + onoff)[0] + 1
+            for t in self.external_data["time"][ievent]:
+                if t not in self.events:
+                    self.events.append(t)
+
+        self.events = np.array(self.events)
 
     def update_external_fields(self):
         if not self.external_data:
