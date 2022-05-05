@@ -83,6 +83,7 @@ _field_map = {
     'turbulent_velocity': (('data', 'turbulent_velocity'), 'code_velocity'),
     'gas_mass_enclosed': (('data', 'gas_mass_enclosed'), 'code_mass'),
     'dark_matter_mass_enclosed': (('data', 'dark_matter_mass_enclosed'), 'code_mass'),
+    'used_bins': (('data', 'used'), ''),
 }
 
 def _get_needed_fields(my_chemistry):

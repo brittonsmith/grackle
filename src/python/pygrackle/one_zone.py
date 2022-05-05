@@ -8,6 +8,7 @@ import abc
 from collections import defaultdict
 import functools
 import numpy as np
+from scipy.interpolate import interp1d
 from unyt import unyt_array, unyt_quantity
 from unyt.unit_registry import UnitRegistry
 
@@ -23,6 +24,7 @@ class OneZoneModel(abc.ABC):
     name = None
     verbose = True
     stopping_criteria = ()
+    _ignore_external = ("time")
 
     def __init__(self, fc, data=None, external_data=None,
                  unit_registry=None, event_trigger_fields=None):
@@ -107,7 +109,8 @@ class OneZoneModel(abc.ABC):
 
     @property
     def external_fields(self):
-        return [field for field in self.external_data if field != "time"]
+        return [field for field in self.external_data
+                if field not in self._ignore_external]
 
     @property
     def remaining_time(self):
@@ -488,6 +491,7 @@ class MinihaloModel(FreeFallModel):
     name = "minihalo"
     stopping_criteria = ("final_time", "final_density", "gas_mass")
     use_dark_matter = False
+    _ignore_external = ("time", "radius", "radial_bins")
 
     def __init__(self, fc, data=None,
                  external_data=None, unit_registry=None,
@@ -512,6 +516,53 @@ class MinihaloModel(FreeFallModel):
 
         self.cosmology = cosmology
         self.initialize_cosmology()
+
+    def prepare_event_times(self, fields):
+        self.events = []
+
+    def update_external_fields(self):
+        if not self.external_data:
+            return
+
+        edata = self.external_data
+        time = edata["time"]
+        itime = np.digitize(self.current_time, time) - 1
+        if itime < 0 or itime >= time.size - 1:
+            return
+
+        u1 = edata["used_bins"][itime]
+        x1 = np.log(edata["radius"][u1])
+        u2 = edata["used_bins"][itime+1]
+        x2 = np.log(edata["radius"][u2])
+        xp = np.log(self.current_radius)
+
+        new_fields = {}
+        for field in self.external_fields:
+            fdata = edata[field]
+
+            y1 = np.log(np.clip(edata[field][itime, u1],
+                                a_min=1e-50, a_max=np.inf))
+            f1 = interp1d(x1, y1)
+            v1 = f1(xp)
+
+            y2 = np.log(np.clip(edata[field][itime+1, u2],
+                                a_min=1e-50, a_max=np.inf))
+            f2 = interp1d(x2, y2)
+            v2 = f2(xp)
+
+            slope = (v2 - v1) / (time[itime+1] - time[itime])
+            new_fields[field] = np.exp(slope * (self.current_time - time[itime]) + v1)
+
+            # if fdata[itime] < 0 or fdata[itime+1] < 0:
+            #     new_fields[field] = fdata[itime]
+            # else:
+                # fdata = np.log(np.clip(fdata, a_min=1e-50, a_max=np.inf))
+                # slope = (fdata[itime+1] - fdata[itime]) / (time[itime+1] - time[itime])
+                # new_fields[field] = \
+                #   np.exp(slope * (self.current_time - time[itime]) + fdata[itime])
+
+        for field in new_fields:
+            self.fc[field][:] = new_fields[field]
 
     def initialize_cosmology(self):
         if self.cosmology is None:
@@ -553,8 +604,10 @@ class MinihaloModel(FreeFallModel):
 
     @property
     def current_radius(self):
-        return self.initial_radius * (self.data["density"][0] /
-                                      self.fc["density"][0])**(1/3)
+        radius = self.initial_radius
+        if self.data is not None:
+            radius *= (self.data["density"][0] / self.fc["density"][0])**(1/3)
+        return radius
 
     def update_quantities(self):
         fc = self.fc
