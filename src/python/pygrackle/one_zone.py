@@ -530,9 +530,8 @@ class MinihaloModel(FreeFallModel):
 
         for field in fields:
             data = self.external_data[field]
-            offon = ((data[:-1,:] <= 0) & (data[1:,:] > 0)).sum(axis=1)
-            onoff = ((data[:-1,:] > 0) & (data[1:,:] <= 0)).sum(axis=1)
-            ievent = np.where(offon + onoff)[0] + 1
+            onoff = (~((data[:-1, :] > 0) ^ (data[1:, :] <= 0))).sum(axis=1)
+            ievent = np.where(onoff)[0] + 1
             for t in self.external_data["time"][ievent]:
                 if t not in self.events:
                     self.events.append(t)
