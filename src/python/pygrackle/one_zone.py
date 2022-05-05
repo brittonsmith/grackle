@@ -536,30 +536,24 @@ class MinihaloModel(FreeFallModel):
         x2 = np.log(edata["radius"][u2])
         xp = np.log(self.current_radius)
 
+        ikwargs = {"kind": "linear", "fill_value": "extrapolate"}
+
         new_fields = {}
         for field in self.external_fields:
             fdata = edata[field]
 
             y1 = np.log(np.clip(edata[field][itime, u1],
                                 a_min=1e-50, a_max=np.inf))
-            f1 = interp1d(x1, y1)
+            f1 = interp1d(x1, y1, **ikwargs)
             v1 = f1(xp)
 
             y2 = np.log(np.clip(edata[field][itime+1, u2],
                                 a_min=1e-50, a_max=np.inf))
-            f2 = interp1d(x2, y2)
+            f2 = interp1d(x2, y2, **ikwargs)
             v2 = f2(xp)
 
             slope = (v2 - v1) / (time[itime+1] - time[itime])
             new_fields[field] = np.exp(slope * (self.current_time - time[itime]) + v1)
-
-            # if fdata[itime] < 0 or fdata[itime+1] < 0:
-            #     new_fields[field] = fdata[itime]
-            # else:
-                # fdata = np.log(np.clip(fdata, a_min=1e-50, a_max=np.inf))
-                # slope = (fdata[itime+1] - fdata[itime]) / (time[itime+1] - time[itime])
-                # new_fields[field] = \
-                #   np.exp(slope * (self.current_time - time[itime]) + fdata[itime])
 
         for field in new_fields:
             self.fc[field][:] = new_fields[field]
