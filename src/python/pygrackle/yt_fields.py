@@ -83,6 +83,7 @@ _field_map = {
     'turbulent_velocity': (('data', 'turbulent_velocity'), 'code_velocity'),
     'gas_mass_enclosed': (('data', 'gas_mass_enclosed'), 'code_mass'),
     'dark_matter_mass_enclosed': (('data', 'dark_matter_mass_enclosed'), 'code_mass'),
+    'gas_density': (('data', 'density'), 'code_mass / code_length**3'),
     'used_bins': (('data', 'used'), ''),
 }
 

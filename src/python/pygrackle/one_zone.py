@@ -650,6 +650,24 @@ class MinihaloModel(FreeFallModel):
         else:
             hydrostatic_pressure = self.data["hydrostatic_pressure"][-1]
 
+            # edata = self.external_data
+            # time = edata["time"]
+            # itime = np.digitize(self.current_time, time) - 1
+            # iradius = np.digitize(self.current_radius, edata["radial_bins"]) - 1
+            # used = np.where(edata["used_bins"][itime])[0]
+            # used = used[used >= iradius]
+
+            # mass_enc = \
+            #   (edata["dark_matter_mass_enclosed"][itime, used] + \
+            #    edata["gas_mass_enclosed"][itime, used]) * \
+            #    my_chemistry.density_units * my_chemistry.length_units**3
+            # rho_gas = edata["gas_density"][itime][used] * my_chemistry.density_units
+            # dr = np.diff(edata["radial_bins"])[used] * my_chemistry.length_units
+            # r = edata["radius"][used] * my_chemistry.length_units
+            # hydrostatic_pressure = \
+            # (gravitational_constant_cgs * mass_enc * rho_gas * dr / r**2).sum() / \
+            #   my_chemistry.pressure_units
+
             P1 = self.data["pressure"][-1]
             T1 = self.data["temperature"][-1]
             mu1 = self.data["mean_molecular_weight"][-1]
