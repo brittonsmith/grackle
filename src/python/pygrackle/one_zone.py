@@ -499,7 +499,8 @@ class MinihaloModel(FreeFallModel):
                  final_time=None, final_density=None,
                  initial_radius=None, gas_mass=None,
                  include_turbulence=True,
-                 event_trigger_fields=None, cosmology=None):
+                 event_trigger_fields=None, cosmology=None,
+                 star_creation_time=None):
 
         self.initial_radius = initial_radius
         self.gas_mass = gas_mass
@@ -516,6 +517,7 @@ class MinihaloModel(FreeFallModel):
 
         self.cosmology = cosmology
         self.initialize_cosmology()
+        self.star_creation_time = star_creation_time
 
     def prepare_event_times(self, fields):
         """
@@ -621,6 +623,69 @@ class MinihaloModel(FreeFallModel):
             radius *= (self.data["density"][0] / self.fc["density"][0])**(1/3)
         return radius
 
+    def calculate_hydrostatic_pressure_profile(self, itime):
+        edata = self.external_data
+        iradius = np.digitize(self.current_radius, edata["radial_bins"])
+        used = np.where(edata["used_bins"][itime])[0]
+        used = used[used >= iradius]
+
+        my_chemistry = self.fc.chemistry_data
+        length_units = my_chemistry.length_units
+        density_units = my_chemistry.density_units
+        mass_units = density_units * length_units**3
+
+        rbins = edata["radial_bins"] * length_units
+        dr = np.diff(rbins)[used]
+        r = edata["radius"][used] * length_units
+        m_dm = edata["dark_matter_mass_enclosed"][itime, used] * mass_units
+
+        if edata["time"][itime] < self.star_creation_time:
+            m_gas = edata["gas_mass_enclosed"][itime, used] * mass_units
+            rho_gas = edata["gas_density"][itime][used] * density_units
+            dpc = 0
+
+        else:
+            rho_dm = edata["dark_matter"][itime][used] * density_units
+
+            # Assume gas density is at cosmic baryon fraction at the virial radius.
+            # At late times, this is roughly true.
+            f_gas = self.cosmology.omega_baryon / self.cosmology.omega_matter
+            rhoc = self.data["density"][-1] * density_units
+            g1 = np.log(rhoc)
+            g2 = np.log(rho_dm[-1] * f_gas)
+            rc = self.current_radius * length_units
+            r1 = np.log(rc)
+            r2 = np.log(rbins[used[-1]+1])
+            lr = np.log(r)
+            slope = (g2 - g1) / (r2 - r1)
+            rho_gas = np.exp(slope * (lr - r1) + g1)
+
+            volume = (4 * np.pi / 3) * (rbins[used+1]**3 - rbins[used]**3)
+            mc = self.gas_mass * mass_units
+            m_gas = (rho_gas * volume).cumsum() + mc
+
+            # Now add the contribution from the parcel of gas we are following,
+            # which should be just inside the central bin.
+            drc = rbins[used[0]] - rc
+            m_totc = mc + m_dm[0]
+            dpc = gravitational_constant_cgs * m_totc * rhoc * drc / rc**2
+
+        m_tot = m_dm + m_gas
+        p_cgs = (gravitational_constant_cgs * m_tot * rho_gas * dr / r**2).sum() + dpc
+        return p_cgs / my_chemistry.pressure_units
+
+    def calculate_hydrostatic_pressure(self):
+        edata = self.external_data
+        time = edata["time"]
+        itime = np.digitize(self.current_time, time) - 1
+
+        p1 = np.log(self.calculate_hydrostatic_pressure_profile(itime))
+        p2 = np.log(self.calculate_hydrostatic_pressure_profile(itime+1))
+        slope = (p2 - p1) / (time[itime+1] - time[itime])
+        p = np.exp(slope * (self.current_time - time[itime]) + p1)
+
+        return p
+
     def update_quantities(self):
         fc = self.fc
         my_chemistry = fc.chemistry_data
@@ -648,25 +713,8 @@ class MinihaloModel(FreeFallModel):
 
         # pressure-dominated
         else:
-            hydrostatic_pressure = self.data["hydrostatic_pressure"][-1]
-
-            # edata = self.external_data
-            # time = edata["time"]
-            # itime = np.digitize(self.current_time, time) - 1
-            # iradius = np.digitize(self.current_radius, edata["radial_bins"]) - 1
-            # used = np.where(edata["used_bins"][itime])[0]
-            # used = used[used >= iradius]
-
-            # mass_enc = \
-            #   (edata["dark_matter_mass_enclosed"][itime, used] + \
-            #    edata["gas_mass_enclosed"][itime, used]) * \
-            #    my_chemistry.density_units * my_chemistry.length_units**3
-            # rho_gas = edata["gas_density"][itime][used] * my_chemistry.density_units
-            # dr = np.diff(edata["radial_bins"])[used] * my_chemistry.length_units
-            # r = edata["radius"][used] * my_chemistry.length_units
-            # hydrostatic_pressure = \
-            # (gravitational_constant_cgs * mass_enc * rho_gas * dr / r**2).sum() / \
-            #   my_chemistry.pressure_units
+            # hydrostatic_pressure = self.data["hydrostatic_pressure"][-1]
+            hydrostatic_pressure = self.calculate_hydrostatic_pressure()
 
             P1 = self.data["pressure"][-1]
             T1 = self.data["temperature"][-1]
