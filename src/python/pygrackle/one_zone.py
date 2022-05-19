@@ -625,9 +625,15 @@ class MinihaloModel(FreeFallModel):
 
     def calculate_hydrostatic_pressure_profile(self, itime):
         edata = self.external_data
-        iradius = np.digitize(self.current_radius, edata["radial_bins"])
+        # subtract 1 to get the bin just inside the current radius
+        iradius = np.digitize(self.current_radius, edata["radial_bins"]) - 1
         used = np.where(edata["used_bins"][itime])[0]
         used = used[used >= iradius]
+
+        # keep inner bin separate
+        iinner = used[0]
+        # save only bins outside current radius
+        used = used[1:]
 
         my_chemistry = self.fc.chemistry_data
         length_units = my_chemistry.length_units
@@ -637,12 +643,23 @@ class MinihaloModel(FreeFallModel):
         rbins = edata["radial_bins"] * length_units
         dr = np.diff(rbins)[used]
         r = edata["radius"][used] * length_units
-        m_dm = edata["dark_matter_mass_enclosed"][itime, used] * mass_units
+        m_dm_all = edata["dark_matter_mass_enclosed"][itime] * mass_units
+        m_dm = m_dm_all[used]
+
+        # "core" values for the central component of the
+        # hydrostatic pressure.
+        rhoc = self.data["density"][-1] * density_units
+        rc = self.current_radius * length_units
+        mc = self.gas_mass * mass_units
+
+        slope = np.log(m_dm_all[used[0]] / m_dm_all[iinner]) / \
+          np.log(rbins[used[0]] / rbins[iinner])
+        m_dmc = np.exp(slope * np.log(rc / rbins[iinner]) +
+                       np.log(m_dm_all[iinner]))
 
         if edata["time"][itime] < self.star_creation_time:
             m_gas = edata["gas_mass_enclosed"][itime, used] * mass_units
             rho_gas = edata["gas_density"][itime][used] * density_units
-            dpc = 0
 
         else:
             rho_dm = edata["dark_matter"][itime][used] * density_units
@@ -650,10 +667,8 @@ class MinihaloModel(FreeFallModel):
             # Assume gas density is at cosmic baryon fraction at the virial radius.
             # At late times, this is roughly true.
             f_gas = self.cosmology.omega_baryon / self.cosmology.omega_matter
-            rhoc = self.data["density"][-1] * density_units
             g1 = np.log(rhoc)
             g2 = np.log(rho_dm[-1] * f_gas)
-            rc = self.current_radius * length_units
             r1 = np.log(rc)
             r2 = np.log(rbins[used[-1]+1])
             lr = np.log(r)
@@ -661,14 +676,13 @@ class MinihaloModel(FreeFallModel):
             rho_gas = np.exp(slope * (lr - r1) + g1)
 
             volume = (4 * np.pi / 3) * (rbins[used+1]**3 - rbins[used]**3)
-            mc = self.gas_mass * mass_units
             m_gas = (rho_gas * volume).cumsum() + mc
 
-            # Now add the contribution from the parcel of gas we are following,
-            # which should be just inside the central bin.
-            drc = rbins[used[0]] - rc
-            m_totc = mc + m_dm[0]
-            dpc = gravitational_constant_cgs * m_totc * rhoc * drc / rc**2
+        # Now add the contribution from the parcel of gas we are following,
+        # which should be just inside the central bin.
+        drc = rbins[used[0]] - rc
+        m_totc = mc + m_dmc
+        dpc = gravitational_constant_cgs * m_totc * rhoc * drc / rc**2
 
         m_tot = m_dm + m_gas
         p_cgs = (gravitational_constant_cgs * m_tot * rho_gas * dr / r**2).sum() + dpc
@@ -681,8 +695,10 @@ class MinihaloModel(FreeFallModel):
 
         p1 = np.log(self.calculate_hydrostatic_pressure_profile(itime))
         p2 = np.log(self.calculate_hydrostatic_pressure_profile(itime+1))
-        slope = (p2 - p1) / (time[itime+1] - time[itime])
-        p = np.exp(slope * (self.current_time - time[itime]) + p1)
+        t1 = time[itime]
+        t2 = time[itime+1]
+        slope = (p2 - p1) / (t2 - t1)
+        p = np.exp(slope * (self.current_time - t1) + p1)
 
         return p
 
