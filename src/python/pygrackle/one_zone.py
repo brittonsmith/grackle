@@ -27,7 +27,7 @@ class OneZoneModel(abc.ABC):
     _ignore_external = ("time")
 
     def __init__(self, fc, data=None, external_data=None,
-                 unit_registry=None, event_trigger_fields=None):
+                 unit_registry=None, event_trigger_fields="all"):
 
         self.fc = fc
         self.data = data
@@ -53,6 +53,10 @@ class OneZoneModel(abc.ABC):
 
         These fields need to be in the external data.
         """
+
+        if fields == "all":
+            self.events = self.external_data["time"]
+            return
 
         self.events = []
         if fields is None:
@@ -368,7 +372,7 @@ class FreeFallModel(OneZoneModel):
                  external_data=None, unit_registry=None,
                  safety_factor=0.01, include_pressure=True,
                  final_time=None, final_density=None,
-                 event_trigger_fields=None):
+                 event_trigger_fields="all"):
 
         self.include_pressure = include_pressure
         self.safety_factor = safety_factor
@@ -499,7 +503,7 @@ class MinihaloModel(FreeFallModel):
                  final_time=None, final_density=None,
                  initial_radius=None, gas_mass=None,
                  include_turbulence=True,
-                 event_trigger_fields=None, cosmology=None,
+                 event_trigger_fields="all", cosmology=None,
                  star_creation_time=None):
 
         self.initial_radius = initial_radius
@@ -525,6 +529,10 @@ class MinihaloModel(FreeFallModel):
 
         These fields need to be in the external data.
         """
+
+        if fields == "all":
+            self.events = self.external_data["time"]
+            return
 
         self.events = []
         if fields is None:
@@ -729,7 +737,6 @@ class MinihaloModel(FreeFallModel):
 
         # pressure-dominated
         else:
-            # hydrostatic_pressure = self.data["hydrostatic_pressure"][-1]
             hydrostatic_pressure = self.calculate_hydrostatic_pressure()
 
             P1 = self.data["pressure"][-1]
