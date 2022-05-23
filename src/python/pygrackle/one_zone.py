@@ -14,7 +14,8 @@ from unyt.unit_registry import UnitRegistry
 
 from pygrackle.utilities.physical_constants import \
     gravitational_constant_cgs, \
-    sec_per_year
+    sec_per_year, \
+    mass_sun_cgs
 
 class OneZoneModel(abc.ABC):
     """
@@ -833,3 +834,387 @@ class MinihaloModel(FreeFallModel):
 
         m_BE = self.calculate_bonnor_ebert_mass()
         self.data["mass_BE"].append(m_BE)
+
+class MinihaloModel1D(MinihaloModel):
+    name = "minihalo1d"
+
+    def add_to_data(self):
+        """
+        Add current fluid container values to the data structure.
+        """
+
+        fc = self.fc
+        if self.data is None:
+            self.data = defaultdict(list)
+        data = self.data
+
+        data["time"].append(self.current_time)
+
+        for field in fc.density_fields:
+            data[field].append(fc[field].copy())
+
+        data["energy"].append(fc["energy"].copy())
+
+        fc.calculate_gamma()
+        data["gamma"].append(fc["gamma"].copy())
+
+        fc.calculate_temperature()
+        data["temperature"].append(fc["temperature"].copy())
+
+        fc.calculate_pressure()
+        data["pressure"].append(fc["pressure"].copy())
+
+        fc.calculate_mean_molecular_weight()
+        data["mean_molecular_weight"].append(fc["mean_molecular_weight"].copy())
+
+        if fc.chemistry_data.h2_on_dust:
+            fc.calculate_dust_temperature()
+            data["dust_temperature"].append(fc["dust_temperature"].copy())
+
+        for field in self.external_fields:
+            data[field].append(fc[field].copy())
+
+        t_ff = self.calculate_free_fall_time()
+        self.data["free_fall_time"].append(t_ff)
+
+        t_cs = self.calculate_sound_crossing_time()
+        self.data["sound_crossing_time"].append(t_cs)
+
+        # Turn off CMB floor to calculate cooling time
+        cmb = fc.chemistry_data.cmb_temperature_floor
+        fc.chemistry_data.cmb_temperature_floor = 0
+        fc.calculate_cooling_time()
+        self.data["cooling_time"].append(fc["cooling_time"].copy())
+        fc.chemistry_data.cmb_temperature_floor = cmb
+
+        m_BE = self.calculate_bonnor_ebert_mass()
+        self.data["mass_BE"].append(m_BE)
+
+    def calculate_free_fall_time(self):
+        density = self.fc["density"].copy()
+        if self.use_dark_matter:
+            density += self.data["dark_matter"][-1]
+        return 1 / (self.freefall_constant * np.sqrt(density))
+
+    def calculate_sound_speed(self):
+        fc = self.fc
+        my_chemistry = fc.chemistry_data
+
+        density = fc["density"]
+        fc.calculate_pressure()
+        pressure = fc["pressure"]
+        fc.calculate_gamma()
+        gamma = fc["gamma"]
+
+        cs = np.sqrt(gamma * pressure / density)
+        if self.include_turbulence:
+            v_turb = self.data["turbulent_velocity"][-1]
+            cs = np.sqrt(cs**2 + v_turb**2)
+
+        return cs
+
+    def calculate_bonnor_ebert_mass(self):
+        ### Bonnor-Ebert Mass constant
+        a = 1.67
+        b = (225 / (32 * np.sqrt(5 * np.pi))) * a**-1.5
+
+        fc = self.fc
+        my_chemistry = fc.chemistry_data
+
+        fc.calculate_pressure()
+        pressure = fc["pressure"]
+
+        # Convert to CGS because I am tired of
+        # messing up cosmological units.
+        # Ignore turbulent velocity for cs in BE mass.
+        include_turbulence = self.include_turbulence
+        self.include_turbulence = False
+        cs_cgs = self.calculate_sound_speed() * \
+          my_chemistry.velocity_units
+        self.include_turbulence = include_turbulence
+
+        G = gravitational_constant_cgs
+        pressure_cgs = pressure * my_chemistry.pressure_units
+        m_BE = (b * (cs_cgs**4 / G**1.5) * pressure_cgs**-0.5)
+
+        mass_units = my_chemistry.density_units * \
+          my_chemistry.length_units**3
+        return m_BE / mass_units
+
+    def update_external_fields(self):
+        if not self.external_data:
+            return
+
+        edata = self.external_data
+        time = edata["time"]
+        itime = np.digitize(self.current_time, time) - 1
+        if itime < 0 or itime >= time.size - 1:
+            return
+
+        u1 = edata["used_bins"][itime]
+        x1 = np.log(edata["radius"][u1])
+        u2 = edata["used_bins"][itime+1]
+        x2 = np.log(edata["radius"][u2])
+        xp = np.log(self.current_radius)
+
+        ikwargs = {"kind": "linear", "fill_value": "extrapolate"}
+
+        new_fields = {}
+        for field in self.external_fields:
+            fdata = edata[field]
+
+            y1 = np.log(np.clip(edata[field][itime, u1],
+                                a_min=1e-50, a_max=np.inf))
+            f1 = interp1d(x1, y1, **ikwargs)
+            v1 = f1(xp)
+
+            y2 = np.log(np.clip(edata[field][itime+1, u2],
+                                a_min=1e-50, a_max=np.inf))
+            f2 = interp1d(x2, y2, **ikwargs)
+            v2 = f2(xp)
+
+            slope = (v2 - v1) / (time[itime+1] - time[itime])
+            new_fields[field] = np.exp(slope * (self.current_time - time[itime]) + v1)
+
+        for field in new_fields:
+            self.fc[field][:] = new_fields[field]
+
+    @property
+    def finished(self):
+        if self.final_density is not None and \
+          (self.fc["density"] >= self.final_density).any():
+            return True
+
+        if self.final_time is not None and \
+          self.current_time >= self.final_time:
+            return True
+
+        if self.gas_mass is not None:
+            m_BE = self.calculate_bonnor_ebert_mass()
+            if (self.gas_mass >= m_BE).any():
+                return True
+
+        return False
+
+    def before_solve_chemistry(self):
+        if "metallicity" in self.external_fields:
+            self.fc["metal"][:] = self.fc["density"][:] * self.fc["metallicity"][:]
+        self.fc.chemistry_data.override_redshift = self.current_redshift
+
+    def update_quantities(self):
+        fc = self.fc
+        my_chemistry = fc.chemistry_data
+
+        tcs = self.calculate_sound_crossing_time()
+        tff = self.calculate_free_fall_time()
+
+        fc.calculate_pressure()
+        pressure = fc["pressure"]
+
+        freefall = tff < tcs
+        factor = np.ones(self.fc.n_vals)
+        e_factor = np.ones(self.fc.n_vals)
+
+        # import pdb ; pdb.set_trace()
+
+        # free-fall
+        if freefall.any():
+            indices = np.where(freefall)[0]
+            self.calculate_collapse_factor(indices=indices)
+            force_factor = fc["force_factor"][indices]
+
+            total_density = fc["density"][indices]
+            if self.use_dark_matter:
+                total_density += fc["dark_matter"][indices]
+
+            factor[indices] = np.sqrt(1 - force_factor) * \
+              self.freefall_constant * np.sqrt(total_density) * self.dt + 1
+
+            # update energy assuming un-altered free-fall collapse
+            e_factor[indices] = \
+              self.freefall_constant * np.sqrt(total_density) * self.dt + 1
+
+        # pressure-dominated
+        if (~freefall).any():
+            indices = np.where(~freefall)[0]
+            hydrostatic_pressure = self.calculate_hydrostatic_pressure()
+
+            P1 = self.data["pressure"][-1][indices]
+            T1 = self.data["temperature"][-1][indices]
+            mu1 = self.data["mean_molecular_weight"][-1][indices]
+            P2 = np.max([pressure[indices], hydrostatic_pressure[indices]], axis=0)
+            P2 = (P1 + P2) / 2
+            fc.calculate_temperature()
+            T2 = fc["temperature"][indices]
+            fc.calculate_mean_molecular_weight()
+            mu2 = fc["mean_molecular_weight"][indices]
+            factor[indices] = (P2 * T1 * mu2) / (T2 * mu1 * P1)
+
+            e_factor[indices] = factor[indices]
+
+        # import pdb ; pdb.set_trace()
+        self.scale_density_fields(factor)
+
+        de = - pressure * (1 - e_factor) / (e_factor * self.fc["density"])
+        fc["energy"] += de
+
+    def calculate_collapse_factor(self, indices=None):
+        """
+        Compute the new density using the modified
+        free-fall collapse as per Omukai et al. (2005).
+        """
+
+        data = self.data
+        self.fc["force_factor"] = np.zeros(self.fc.n_vals)
+
+        if not self.include_pressure:
+            return
+
+        if indices is None:
+            indices = slice(None)
+
+        # Calculate the effective adiabatic index, dlog(p)/dlog(rho).
+        density = data["density"]
+        pressure = data["pressure"]
+
+        if len(pressure) < 3:
+            return
+
+        density = np.array(density[-3:])[:, indices]
+        pressure = np.array(pressure[-3:])[:, indices]
+        import pdb ; pdb.set_trace()
+
+        # compute dlog(p) / dlog(rho) using last two timesteps
+        gamma_eff = np.log10(pressure[-1] / pressure[-2]) / \
+            np.log10(density[-1] / density[-2])
+
+        # compute a higher order derivative if more than two points available
+        if len(pressure) > 2:
+            gamma_eff += 0.5 * ((np.log10(pressure[-2] / pressure[-3]) /
+                                 np.log10(density[-2] / density[-3])) - gamma_eff)
+
+        gamma_eff = min(gamma_eff, 4./3.)
+
+        # Equation 9 of Omukai et al. (2005)
+        if gamma_eff < 0.83:
+            force_factor = 0.0
+        elif gamma_eff < 1.0:
+            X = gamma_eff - 1
+            force_factor = 0.6 + 2.5 * X - 6.0 * np.power(X, 2.)
+        else:
+            X = gamma_eff - 4/3
+            force_factor = 1.0 + 0.2 * X - 2.9 * np.power(X, 2.)
+        force_factor = max(force_factor, 0.0)
+        force_factor = min(force_factor, 0.95)
+
+        self.fc["force_factor"] = np.array([force_factor])
+
+    @property
+    def current_radius(self):
+        radius = self.initial_radius
+        if self.data is not None:
+            radius *= (self.data["density"][0] / self.fc["density"])**(1/3)
+        return radius
+
+    def calculate_hydrostatic_pressure_profile(self, itime):
+        my_chemistry = self.fc.chemistry_data
+        length_units = my_chemistry.length_units
+        density_units = my_chemistry.density_units
+        mass_units = density_units * length_units**3
+        edata = self.external_data
+
+        used = np.where(edata["used_bins"][itime])[0]
+        iradius = np.digitize(self.current_radius, edata["radial_bins"])
+        r_used = used[used >= iradius.max()]
+
+        # Construct an array consisting of the radii we are following
+        # explicitly and the profile bins outside that.
+        m_dm = edata["dark_matter_mass_enclosed"][itime, r_used] * mass_units
+        r = edata["radius"][r_used] * length_units
+        rbins = edata["radial_bins"] * length_units
+        dr = np.diff(rbins)[r_used]
+
+        # First the ones we're following.
+        rhoc = self.data["density"][-1] * density_units
+        rc = self.current_radius * length_units
+        m_gasc = self.gas_mass * mass_units
+        drc = np.gradient(m_gasc) / (4 * np.pi * rhoc * rc**2)
+
+        # Calculate dark matter mass for gas parcels by interpolating
+        # from profiles.
+        r_all = edata["radius"][used] * length_units
+        m_dm_all = edata["dark_matter_mass_enclosed"][itime, used] * mass_units
+        m_dm_all = np.clip(m_dm_all, a_min=1e-50, a_max=np.inf)
+        x1 = np.log(r_all)
+        y1 = np.log(m_dm_all)
+        ikwargs = {"kind": "linear", "fill_value": "extrapolate"}
+        f1 = interp1d(x1, y1, **ikwargs)
+        m_dmc = np.exp(f1(np.log(rc)))
+        m_totc = m_gasc + m_dmc
+
+        if edata["time"][itime] < self.star_creation_time:
+            m_gas = edata["gas_mass_enclosed"][itime, r_used] * mass_units
+            rho_gas = edata["gas_density"][itime][r_used] * density_units
+
+        else:
+            # Assume gas density is at cosmic baryon fraction at the virial radius.
+            # At late times, this is roughly true.
+            rho_dm = edata["dark_matter"][itime][r_used] * density_units
+            f_gas = self.cosmology.omega_baryon / self.cosmology.omega_matter
+            g1 = np.log(rhoc[-1])
+            g2 = np.log(rho_dm[-1] * f_gas)
+            r1 = np.log(rc[-1])
+            r2 = np.log(rbins[r_used[-1]+1])
+            lr = np.log(r)
+            slope = (g2 - g1) / (r2 - r1)
+            rho_gas = np.exp(slope * (lr - r1) + g1)
+
+            volume = (4 * np.pi / 3) * (rbins[r_used+1]**3 - rbins[r_used]**3)
+            m_gas = (rho_gas * volume).cumsum() + m_gasc[-1]
+
+        G = gravitational_constant_cgs
+        dpc = G * m_totc * rhoc * drc / rc**2
+        # add pressure from radial bins outside the gas parcels
+        m_tot = m_dm + m_gas
+        dpp = G * m_tot * rho_gas * dr / r**2
+        dp = np.concatenate([dpc, dpp])
+
+        p_cgs = np.flip(np.flip(dp).cumsum())[:self.fc.n_vals]
+        return p_cgs / my_chemistry.pressure_units
+
+    def calculate_hydrostatic_pressure(self):
+        edata = self.external_data
+        time = edata["time"]
+        itime = np.digitize(self.current_time, time) - 1
+
+        p1 = np.log(self.calculate_hydrostatic_pressure_profile(itime))
+        p2 = np.log(self.calculate_hydrostatic_pressure_profile(itime+1))
+        t1 = time[itime]
+        t2 = time[itime+1]
+        slope = (p2 - p1) / (t2 - t1)
+        p = np.exp(slope * (self.current_time - t1) + p1)
+
+        return p
+
+    def print_status(self):
+        if not self.verbose:
+            return
+
+        fc = self.fc
+        my_chemistry = fc.chemistry_data
+
+        m_BE = self.calculate_bonnor_ebert_mass()
+        ratio = self.gas_mass / m_BE
+        index = ratio.argmax()
+        index = 0
+
+        cmass = self.gas_mass[index] * my_chemistry.density_units * \
+          my_chemistry.length_units**3 / mass_sun_cgs
+        ctime = self.current_time * my_chemistry.time_units / sec_per_year / 1e6
+        cdensity = fc["density"][index] * my_chemistry.density_units
+        ctemperature = fc["temperature"][index]
+
+        status = f"Evolve {self.name} - t: {ctime:8g} Myr, " + \
+          f"m: {cmass:8g} Msun, " + \
+          f"rho: {cdensity:8g} g/cm^3, T: {ctemperature:8g} K, M/M_BE: {ratio[index]:8g}"
+        print (status, flush=True)
