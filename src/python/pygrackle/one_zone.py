@@ -26,6 +26,7 @@ class OneZoneModel(abc.ABC):
     verbose = True
     stopping_criteria = ()
     _ignore_external = ("time")
+    _cmb_in_cooling_time = False
 
     def __init__(self, fc, data=None, external_data=None,
                  unit_registry=None, event_trigger_fields="all"):
@@ -72,6 +73,21 @@ class OneZoneModel(abc.ABC):
 
         self.events = np.array(self.events)
 
+    def get_current_field(self, field, copy=False):
+        """
+        Return current field values, i.e., from the fluid container.
+        """
+
+        fc = self.fc
+        size = fc.n_vals
+
+        data = fc[field]
+        if size == 1:
+            return data[0]
+        if copy:
+            return data.copy()
+        return data
+
     _arr = None
     @property
     def arr(self):
@@ -108,7 +124,7 @@ class OneZoneModel(abc.ABC):
 
     def calculate_timestep(self):
         self.fc.calculate_cooling_time()
-        dt = self.safety_factor * np.abs(self.fc["cooling_time"][0])
+        dt = self.safety_factor * np.abs(self.get_current_field("cooling_time"))
         dt = min(dt, self.remaining_time)
         return dt
 
@@ -184,28 +200,29 @@ class OneZoneModel(abc.ABC):
 
         data["time"].append(self.current_time)
 
-        for field in fc.density_fields:
-            data[field].append(fc[field][0])
-        data["energy"].append(fc["energy"][0])
-
-        fc.calculate_gamma()
-        data["gamma"].append(fc["gamma"][0])
-
-        fc.calculate_temperature()
-        data["temperature"].append(fc["temperature"][0])
-
-        fc.calculate_pressure()
-        data["pressure"].append(fc["pressure"][0])
-
-        fc.calculate_mean_molecular_weight()
-        data["mean_molecular_weight"].append(fc["mean_molecular_weight"][0])
-
+        cfields = ["gamma", "temperature", "pressure", "mean_molecular_weight"]
         if fc.chemistry_data.h2_on_dust:
-            fc.calculate_dust_temperature()
-            data["dust_temperature"].append(fc["dust_temperature"][0])
+            cfields.append("dust_temperature")
 
-        for field in self.external_fields:
-            data[field].append(fc[field][0])
+        for field in cfields:
+            getattr(fc, f"calculate_{field}")()
+
+        # Turn off CMB floor to calculate cooling time
+        cmb = fc.chemistry_data.cmb_temperature_floor
+        if not self._cmb_in_cooling_time:
+            fc.chemistry_data.cmb_temperature_floor = 0
+        fc.calculate_cooling_time()
+        fc.chemistry_data.cmb_temperature_floor = cmb
+        cfields.append("cooling_time")
+
+        all_fields = \
+          fc.density_fields + \
+          self.external_fields + \
+          cfields + \
+          ["energy"]
+
+        for field in all_fields:
+            data[field].append(self.get_current_field(field, copy=True))
 
     def finalize_data(self):
         """
@@ -310,7 +327,7 @@ class CoolingModel(OneZoneModel):
     @property
     def finished(self):
         if self.final_temperature is not None and \
-          self.fc["temperature"][0] <= self.final_temperature:
+          self.get_current_field("temperature") <= self.final_temperature:
             return True
 
         if self.final_time is not None and \
@@ -716,7 +733,7 @@ class MinihaloModel(FreeFallModel):
         my_chemistry = fc.chemistry_data
 
         tcs = self.calculate_sound_crossing_time()
-        tff = self.calculate_free_fall_time()
+        tff = self.calculate_freefall_time()
 
         fc.calculate_pressure()
         pressure = fc["pressure"][0]
@@ -780,7 +797,7 @@ class MinihaloModel(FreeFallModel):
         return 2 * self.current_radius * \
           self.fc.chemistry_data.a_value / cs
 
-    def calculate_free_fall_time(self):
+    def calculate_freefall_time(self):
         density = self.fc["density"][0]
         if self.use_dark_matter:
             density += self.data["dark_matter"][-1]
@@ -817,80 +834,19 @@ class MinihaloModel(FreeFallModel):
     def add_to_data(self):
         super().add_to_data()
 
-        fc = self.fc
+        fields = \
+          ["freefall_time",
+           "sound_crossing_time",
+           "bonnor_ebert_mass"]
 
-        t_ff = self.calculate_free_fall_time()
-        self.data["free_fall_time"].append(t_ff)
-
-        t_cs = self.calculate_sound_crossing_time()
-        self.data["sound_crossing_time"].append(t_cs)
-
-        # Turn off CMB floor to calculate cooling time
-        cmb = fc.chemistry_data.cmb_temperature_floor
-        fc.chemistry_data.cmb_temperature_floor = 0
-        fc.calculate_cooling_time()
-        self.data["cooling_time"].append(fc["cooling_time"][0])
-        fc.chemistry_data.cmb_temperature_floor = cmb
-
-        m_BE = self.calculate_bonnor_ebert_mass()
-        self.data["mass_BE"].append(m_BE)
+        for field in fields:
+            val = getattr(self, f"calculate_{field}")()
+            self.data[field].append(val)
 
 class MinihaloModel1D(MinihaloModel):
     name = "minihalo1d"
 
-    def add_to_data(self):
-        """
-        Add current fluid container values to the data structure.
-        """
-
-        fc = self.fc
-        if self.data is None:
-            self.data = defaultdict(list)
-        data = self.data
-
-        data["time"].append(self.current_time)
-
-        for field in fc.density_fields:
-            data[field].append(fc[field].copy())
-
-        data["energy"].append(fc["energy"].copy())
-
-        fc.calculate_gamma()
-        data["gamma"].append(fc["gamma"].copy())
-
-        fc.calculate_temperature()
-        data["temperature"].append(fc["temperature"].copy())
-
-        fc.calculate_pressure()
-        data["pressure"].append(fc["pressure"].copy())
-
-        fc.calculate_mean_molecular_weight()
-        data["mean_molecular_weight"].append(fc["mean_molecular_weight"].copy())
-
-        if fc.chemistry_data.h2_on_dust:
-            fc.calculate_dust_temperature()
-            data["dust_temperature"].append(fc["dust_temperature"].copy())
-
-        for field in self.external_fields:
-            data[field].append(fc[field].copy())
-
-        t_ff = self.calculate_free_fall_time()
-        self.data["free_fall_time"].append(t_ff)
-
-        t_cs = self.calculate_sound_crossing_time()
-        self.data["sound_crossing_time"].append(t_cs)
-
-        # Turn off CMB floor to calculate cooling time
-        cmb = fc.chemistry_data.cmb_temperature_floor
-        fc.chemistry_data.cmb_temperature_floor = 0
-        fc.calculate_cooling_time()
-        self.data["cooling_time"].append(fc["cooling_time"].copy())
-        fc.chemistry_data.cmb_temperature_floor = cmb
-
-        m_BE = self.calculate_bonnor_ebert_mass()
-        self.data["mass_BE"].append(m_BE)
-
-    def calculate_free_fall_time(self):
+    def calculate_freefall_time(self):
         density = self.fc["density"].copy()
         if self.use_dark_matter:
             density += self.data["dark_matter"][-1]
@@ -1006,7 +962,7 @@ class MinihaloModel1D(MinihaloModel):
         my_chemistry = fc.chemistry_data
 
         tcs = self.calculate_sound_crossing_time()
-        tff = self.calculate_free_fall_time()
+        tff = self.calculate_freefall_time()
 
         fc.calculate_pressure()
         pressure = fc["pressure"]
