@@ -265,11 +265,10 @@ class OneZoneModel(abc.ABC):
         if not self.verbose:
             return
 
-        fc = self.fc
-        my_chemistry = fc.chemistry_data
+        my_chemistry = self.fc.chemistry_data
         ctime = self.current_time * my_chemistry.time_units / sec_per_year
-        cdensity = fc["density"][0] * my_chemistry.density_units
-        ctemperature = fc["temperature"][0]
+        cdensity = self.get_current_field("density") * my_chemistry.density_units
+        ctemperature = self.get_current_field("temperature")
 
         status = f"Evolve {self.name} - t: {ctime:e} yr, " + \
           f"rho: {cdensity:e} g/cm^3, T: {ctemperature:e} K."
@@ -352,9 +351,9 @@ class ConstantPressureModel(CoolingModel):
         T1 = self.data["temperature"][-1]
         mu1 = self.data["mean_molecular_weight"][-1]
         fc.calculate_temperature()
-        T2 = fc["temperature"][0]
+        T2 = self.get_current_field("temperature")
         fc.calculate_mean_molecular_weight()
-        mu2 = fc["mean_molecular_weight"][0]
+        mu2 = self.get_current_field("mean_molecular_weight")
         factor = (T1 * mu2) / (T2 * mu1)
 
         self.scale_density_fields(factor)
@@ -372,11 +371,11 @@ class ConstantEntropyModel(ConstantPressureModel):
         g1 = self.data["gamma"][-1]
 
         fc.calculate_temperature()
-        T2 = fc["temperature"][0]
+        T2 = self.get_current_field("temperature")
         fc.calculate_mean_molecular_weight()
-        mu2 = fc["mean_molecular_weight"][0]
+        mu2 = self.get_current_field("mean_molecular_weight")
         fc.calculate_gamma()
-        g2 = fc['gamma'][0]
+        g2 = self.get_current_field("gamma")
         factor = (mu2 / mu1) * (rho1 / mu1)**((g1-g2)/(g2-1)) * \
           (T2 / T1)**(1 / (g2 - 1))
 
@@ -420,7 +419,7 @@ class FreeFallModel(OneZoneModel):
     @property
     def finished(self):
         if self.final_density is not None and \
-          self.fc["density"][0] >= self.final_density:
+          self.get_current_field("density") >= self.final_density:
             return True
 
         if self.final_time is not None and \
@@ -432,13 +431,13 @@ class FreeFallModel(OneZoneModel):
     def calculate_timestep(self):
         fc = self.fc
         dt_ff = self.safety_factor / self.freefall_constant / \
-          np.sqrt(fc["density"][0])
+          np.sqrt(self.get_current_field("density"))
 
         fc.calculate_cooling_time()
         dt_cool = self.safety_factor * \
-          np.abs(fc["cooling_time"][0])
+          np.abs(self.get_current_field("cooling_time"))
 
-        dt = min(dt_ff, dt_cool)
+        dt = min(np.min(dt_ff), np.min(dt_cool))
         dt = min(dt, self.remaining_time)
         self.dt = dt
         return dt
@@ -448,21 +447,21 @@ class FreeFallModel(OneZoneModel):
         my_chemistry = fc.chemistry_data
 
         self.calculate_collapse_factor()
-        force_factor = fc["force_factor"][0]
+        force_factor = self.get_current_field("force_factor")
 
         self.fc.calculate_pressure()
-        pressure = self.fc["pressure"][0]
-        density = self.fc["density"][0]
-        factor = np.sqrt(1 - force_factor) * \
-          self.freefall_constant * np.sqrt(density) * self.dt + 1
+        pressure = self.get_current_field("pressure")
+        density = self.get_current_field("density")
+        val = self.freefall_constant * np.sqrt(density) * self.dt
+        factor = np.sqrt(1 - force_factor) * val + 1
 
         # update energy assuming un-altered free-fall collapse
-        e_factor = self.freefall_constant * np.sqrt(density) * self.dt + 1
+        e_factor = val + 1
 
         self.scale_density_fields(factor)
 
         de = - pressure * (1 - e_factor) / (e_factor * density)
-        fc["energy"][0] += de
+        fc["energy"][:] += de
 
     def calculate_collapse_factor(self):
         """
@@ -473,7 +472,7 @@ class FreeFallModel(OneZoneModel):
         data = self.data
 
         if not self.include_pressure:
-            self.fc["force_factor"] = np.array([0])
+            self.fc["force_factor"] = np.zeros(self.fc.n_vals)
             return
 
         # Calculate the effective adiabatic index, dlog(p)/dlog(rho).
@@ -481,7 +480,7 @@ class FreeFallModel(OneZoneModel):
         pressure = data["pressure"]
 
         if len(pressure) < 3:
-            self.fc["force_factor"] = np.array([0])
+            self.fc["force_factor"] = np.zeros(self.fc.n_vals)
             return
 
         # compute dlog(p) / dlog(rho) using last two timesteps
@@ -639,14 +638,16 @@ class MinihaloModel(FreeFallModel):
 
     def before_solve_chemistry(self):
         if "metallicity" in self.external_fields:
-            self.fc["metal"][0] = self.fc["density"][0] * self.fc["metallicity"][0]
+            self.fc["metal"][:] = self.get_current_field("density") * \
+              self.get_current_field("metallicity")
         self.fc.chemistry_data.override_redshift = self.current_redshift
 
     @property
     def current_radius(self):
         radius = self.initial_radius
         if self.data is not None:
-            radius *= (self.data["density"][0] / self.fc["density"][0])**(1/3)
+            radius *= (self.data["density"][0] /
+                       self.get_current_field("density"))**(1/3)
         return radius
 
     def calculate_hydrostatic_pressure_profile(self, itime):
@@ -736,22 +737,22 @@ class MinihaloModel(FreeFallModel):
         tff = self.calculate_freefall_time()
 
         fc.calculate_pressure()
-        pressure = fc["pressure"][0]
+        pressure = self.get_current_field("pressure")
 
         # free-fall
         if (tff < tcs):
             self.calculate_collapse_factor()
-            force_factor = fc["force_factor"][0]
+            force_factor = self.get_current_field("force_factor")
 
-            total_density = fc["density"][0]
+            total_density = self.get_current_field("density", copy=True)
             if self.use_dark_matter:
-                total_density += fc["dark_matter"][0]
+                total_density += self.get_current_field("dark_matter")
 
-            factor = np.sqrt(1 - force_factor) * \
-              self.freefall_constant * np.sqrt(total_density) * self.dt + 1
+            val = self.freefall_constant * np.sqrt(total_density) * self.dt
+            factor = np.sqrt(1 - force_factor) * val + 1
 
             # update energy assuming un-altered free-fall collapse
-            e_factor = self.freefall_constant * np.sqrt(total_density) * self.dt + 1
+            e_factor = val + 1
 
         # pressure-dominated
         else:
@@ -763,27 +764,28 @@ class MinihaloModel(FreeFallModel):
             P2 = max(pressure, hydrostatic_pressure)
             P2 = (P1 + P2) / 2
             fc.calculate_temperature()
-            T2 = fc["temperature"][0]
+            T2 = self.get_current_field("temperature")
             fc.calculate_mean_molecular_weight()
-            mu2 = fc["mean_molecular_weight"][0]
+            mu2 = self.get_current_field("mean_molecular_weight")
             factor = (P2 * T1 * mu2) / (T2 * mu1 * P1)
 
             e_factor = factor
 
         self.scale_density_fields(factor)
 
-        de = - pressure * (1 - e_factor) / (e_factor * self.fc["density"][0])
-        fc["energy"][0] += de
+        de = - pressure * (1 - e_factor) / \
+          (e_factor * self.get_current_field("density"))
+        fc["energy"][:] += de
 
     def calculate_sound_speed(self):
         fc = self.fc
         my_chemistry = fc.chemistry_data
 
-        density = fc["density"][0]
+        density = self.get_current_field("density")
         fc.calculate_pressure()
-        pressure = fc["pressure"][0]
+        pressure = self.get_current_field("pressure")
         fc.calculate_gamma()
-        gamma = fc["gamma"][0]
+        gamma = self.get_current_field("gamma")
 
         cs = np.sqrt(gamma * pressure / density)
         if self.include_turbulence:
@@ -798,9 +800,9 @@ class MinihaloModel(FreeFallModel):
           self.fc.chemistry_data.a_value / cs
 
     def calculate_freefall_time(self):
-        density = self.fc["density"][0]
+        density = self.get_current_field("density", copy=True)
         if self.use_dark_matter:
-            density += self.data["dark_matter"][-1]
+            density += self.get_current_field("dark_matter")
         return 1 / (self.freefall_constant * np.sqrt(density))
 
     def calculate_bonnor_ebert_mass(self):
@@ -812,7 +814,7 @@ class MinihaloModel(FreeFallModel):
         my_chemistry = fc.chemistry_data
 
         fc.calculate_pressure()
-        pressure = fc["pressure"][0]
+        pressure = self.get_current_field("pressure")
 
         # Convert to CGS because I am tired of
         # messing up cosmological units.
