@@ -156,7 +156,6 @@ class OneZoneModel(abc.ABC):
                 f"Must specify at least one stopping criteria: {self.stopping_criteria}.")
 
     def calculate_timestep(self):
-        self.fc.calculate_cooling_time()
         dt = self.safety_factor * np.abs(self.get_current_field("cooling_time"))
         dt = min(dt, self.remaining_time)
         return dt
@@ -378,9 +377,7 @@ class ConstantPressureModel(CoolingModel):
 
         T1 = self.data["temperature"][-1]
         mu1 = self.data["mean_molecular_weight"][-1]
-        fc.calculate_temperature()
         T2 = self.get_current_field("temperature")
-        fc.calculate_mean_molecular_weight()
         mu2 = self.get_current_field("mean_molecular_weight")
         factor = (T1 * mu2) / (T2 * mu1)
 
@@ -398,11 +395,8 @@ class ConstantEntropyModel(ConstantPressureModel):
         rho1 = self.data["density"][-1]
         g1 = self.data["gamma"][-1]
 
-        fc.calculate_temperature()
         T2 = self.get_current_field("temperature")
-        fc.calculate_mean_molecular_weight()
         mu2 = self.get_current_field("mean_molecular_weight")
-        fc.calculate_gamma()
         g2 = self.get_current_field("gamma")
         factor = (mu2 / mu1) * (rho1 / mu1)**((g1-g2)/(g2-1)) * \
           (T2 / T1)**(1 / (g2 - 1))
@@ -461,7 +455,6 @@ class FreeFallModel(OneZoneModel):
         dt_ff = self.safety_factor / self.freefall_constant / \
           np.sqrt(self.get_current_field("density"))
 
-        fc.calculate_cooling_time()
         dt_cool = self.safety_factor * \
           np.abs(self.get_current_field("cooling_time"))
 
@@ -477,7 +470,6 @@ class FreeFallModel(OneZoneModel):
         self.calculate_collapse_factor()
         force_factor = self.get_current_field("force_factor")
 
-        self.fc.calculate_pressure()
         pressure = self.get_current_field("pressure")
         density = self.get_current_field("density")
         val = self.freefall_constant * np.sqrt(density) * self.dt
@@ -764,7 +756,6 @@ class MinihaloModel(FreeFallModel):
         tcs = self.calculate_sound_crossing_time()
         tff = self.calculate_freefall_time()
 
-        fc.calculate_pressure()
         pressure = self.get_current_field("pressure")
 
         # free-fall
@@ -791,9 +782,7 @@ class MinihaloModel(FreeFallModel):
             mu1 = self.data["mean_molecular_weight"][-1]
             P2 = max(pressure, hydrostatic_pressure)
             P2 = (P1 + P2) / 2
-            fc.calculate_temperature()
             T2 = self.get_current_field("temperature")
-            fc.calculate_mean_molecular_weight()
             mu2 = self.get_current_field("mean_molecular_weight")
             factor = (P2 * T1 * mu2) / (T2 * mu1 * P1)
 
@@ -810,9 +799,7 @@ class MinihaloModel(FreeFallModel):
         my_chemistry = fc.chemistry_data
 
         density = self.get_current_field("density")
-        fc.calculate_pressure()
         pressure = self.get_current_field("pressure")
-        fc.calculate_gamma()
         gamma = self.get_current_field("gamma")
 
         cs = np.sqrt(gamma * pressure / density)
@@ -841,7 +828,6 @@ class MinihaloModel(FreeFallModel):
         fc = self.fc
         my_chemistry = fc.chemistry_data
 
-        fc.calculate_pressure()
         pressure = self.get_current_field("pressure")
 
         # Convert to CGS because I am tired of
@@ -887,9 +873,7 @@ class MinihaloModel1D(MinihaloModel):
         my_chemistry = fc.chemistry_data
 
         density = fc["density"]
-        fc.calculate_pressure()
         pressure = fc["pressure"]
-        fc.calculate_gamma()
         gamma = fc["gamma"]
 
         cs = np.sqrt(gamma * pressure / density)
@@ -907,7 +891,6 @@ class MinihaloModel1D(MinihaloModel):
         fc = self.fc
         my_chemistry = fc.chemistry_data
 
-        fc.calculate_pressure()
         pressure = fc["pressure"]
 
         # Convert to CGS because I am tired of
