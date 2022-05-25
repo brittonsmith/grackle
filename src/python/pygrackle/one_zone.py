@@ -17,6 +17,15 @@ from pygrackle.utilities.physical_constants import \
     sec_per_year, \
     mass_sun_cgs
 
+_fc_calc_fields = (
+    "cooling_time",
+    "dust_temperature",
+    "gamma",
+    "mean_molecular_weight",
+    "pressure",
+    "temperature",
+)
+
 class OneZoneModel(abc.ABC):
     """
     Class for running one-zone models with a pygrackle fluid container.
@@ -73,6 +82,20 @@ class OneZoneModel(abc.ABC):
 
         self.events = np.array(self.events)
 
+    def calculate_cooling_time(self):
+        """
+        Thin wrapper around fluid container method.
+
+        This will optionally remove the cmb floor.
+        """
+
+        fc = self.fc
+        cmb = fc.chemistry_data.cmb_temperature_floor
+        if not self._cmb_in_cooling_time:
+            fc.chemistry_data.cmb_temperature_floor = 0
+        fc.calculate_cooling_time()
+        fc.chemistry_data.cmb_temperature_floor = cmb
+
     def get_current_field(self, field, copy=False):
         """
         Return current field values, i.e., from the fluid container.
@@ -80,6 +103,16 @@ class OneZoneModel(abc.ABC):
 
         fc = self.fc
         size = fc.n_vals
+
+        if field in _fc_calc_fields:
+            fname = f"calculate_{field}"
+            # check for a method associated with the one-zone model
+            cfunc = getattr(self, fname, None)
+            # if none, then just call the fluid container method
+            if cfunc is None:
+                getattr(fc, fname)()
+            else:
+                getattr(self, fname)()
 
         data = fc[field]
         if size == 1:
@@ -200,20 +233,15 @@ class OneZoneModel(abc.ABC):
 
         data["time"].append(self.current_time)
 
-        cfields = ["gamma", "temperature", "pressure", "mean_molecular_weight"]
+        cfields = [
+            "cooling_time",
+            "gamma",
+            "mean_molecular_weight",
+            "pressure",
+            "temperature"
+        ]
         if fc.chemistry_data.h2_on_dust:
             cfields.append("dust_temperature")
-
-        for field in cfields:
-            getattr(fc, f"calculate_{field}")()
-
-        # Turn off CMB floor to calculate cooling time
-        cmb = fc.chemistry_data.cmb_temperature_floor
-        if not self._cmb_in_cooling_time:
-            fc.chemistry_data.cmb_temperature_floor = 0
-        fc.calculate_cooling_time()
-        fc.chemistry_data.cmb_temperature_floor = cmb
-        cfields.append("cooling_time")
 
         all_fields = \
           fc.density_fields + \
