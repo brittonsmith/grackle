@@ -664,11 +664,12 @@ class MinihaloModel(FreeFallModel):
 
     @property
     def current_radius(self):
-        radius = self.initial_radius
-        if self.data is not None:
-            radius *= (self.data["density"][0] /
-                       self.get_current_field("density"))**(1/3)
-        return radius
+        if self.data is None:
+            factor = 1
+        else:
+            factor= (self.data["density"][0] /
+                     self.get_current_field("density"))**(1/3)
+        return self.initial_radius * factor
 
     def calculate_hydrostatic_pressure_profile(self, itime):
         edata = self.external_data
@@ -861,27 +862,6 @@ class MinihaloModel(FreeFallModel):
 
 class MinihaloModel1D(MinihaloModel):
     name = "minihalo1d"
-
-    def calculate_freefall_time(self):
-        density = self.fc["density"].copy()
-        if self.use_dark_matter:
-            density += self.data["dark_matter"][-1]
-        return 1 / (self.freefall_constant * np.sqrt(density))
-
-    def calculate_sound_speed(self):
-        fc = self.fc
-        my_chemistry = fc.chemistry_data
-
-        density = fc["density"]
-        pressure = fc["pressure"]
-        gamma = fc["gamma"]
-
-        cs = np.sqrt(gamma * pressure / density)
-        if self.include_turbulence:
-            v_turb = self.data["turbulent_velocity"][-1]
-            cs = np.sqrt(cs**2 + v_turb**2)
-
-        return cs
 
     def calculate_bonnor_ebert_mass(self):
         ### Bonnor-Ebert Mass constant
@@ -1077,13 +1057,6 @@ class MinihaloModel1D(MinihaloModel):
         force_factor = min(force_factor, 0.95)
 
         self.fc["force_factor"] = np.array([force_factor])
-
-    @property
-    def current_radius(self):
-        radius = self.initial_radius
-        if self.data is not None:
-            radius *= (self.data["density"][0] / self.fc["density"])**(1/3)
-        return radius
 
     def calculate_hydrostatic_pressure_profile(self, itime):
         my_chemistry = self.fc.chemistry_data
