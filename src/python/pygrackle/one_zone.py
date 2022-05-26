@@ -353,7 +353,7 @@ class CoolingModel(OneZoneModel):
     @property
     def finished(self):
         if self.final_temperature is not None and \
-          self.get_current_field("temperature") <= self.final_temperature:
+          np.min(self.get_current_field("temperature")) <= self.final_temperature:
             return True
 
         if self.final_time is not None and \
@@ -441,7 +441,7 @@ class FreeFallModel(OneZoneModel):
     @property
     def finished(self):
         if self.final_density is not None and \
-          self.get_current_field("density") >= self.final_density:
+          np.max(self.get_current_field("density")) >= self.final_density:
             return True
 
         if self.final_time is not None and \
@@ -515,6 +515,8 @@ class FreeFallModel(OneZoneModel):
             gamma_eff += 0.5 * ((np.log10(pressure[-2] / pressure[-3]) /
                                  np.log10(density[-2] / density[-3])) - gamma_eff)
 
+        if self.fc.n_vals == 1:
+            gamma_eff = np.asarray(gamma_eff)
         np.clip(gamma_eff, a_min=-np.inf, a_max=4/3, out=gamma_eff)
 
         # Equation 9 of Omukai et al. (2005)
@@ -655,7 +657,7 @@ class MinihaloModel(FreeFallModel):
 
         if self.gas_mass is not None:
             m_BE = self.calculate_bonnor_ebert_mass()
-            if self.gas_mass >= m_BE:
+            if np.max(self.gas_mass / m_BE) >= 1:
                 return True
 
         return False
@@ -872,23 +874,6 @@ class MinihaloModel(FreeFallModel):
 
 class MinihaloModel1D(MinihaloModel):
     name = "minihalo1d"
-
-    @property
-    def finished(self):
-        if self.final_density is not None and \
-          (self.get_current_field("density") >= self.final_density).any():
-            return True
-
-        if self.final_time is not None and \
-          self.current_time >= self.final_time:
-            return True
-
-        if self.gas_mass is not None:
-            m_BE = self.calculate_bonnor_ebert_mass()
-            if (self.gas_mass >= m_BE).any():
-                return True
-
-        return False
 
     def calculate_hydrostatic_pressure_profile(self, itime):
         my_chemistry = self.fc.chemistry_data
