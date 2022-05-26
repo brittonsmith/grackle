@@ -36,6 +36,7 @@ class OneZoneModel(abc.ABC):
     stopping_criteria = ()
     _ignore_external = ("time")
     _cmb_in_cooling_time = False
+    _finalized = False
 
     def __init__(self, fc, data=None, external_data=None,
                  unit_registry=None, event_trigger_fields="all"):
@@ -286,6 +287,8 @@ class OneZoneModel(abc.ABC):
                   self.arr(data[field], "cm/s")
             else:
                 data[field] = np.array(data[field])
+
+        self._finalized = True
         return data
 
     def print_status(self):
@@ -550,7 +553,7 @@ class MinihaloModel(FreeFallModel):
                  star_creation_time=None):
 
         self.initial_radius = initial_radius
-        self.gas_mass = gas_mass
+        self._gas_mass = gas_mass
         self.include_turbulence = include_turbulence
 
         super().__init__(fc, data=data,
@@ -565,6 +568,14 @@ class MinihaloModel(FreeFallModel):
         self.cosmology = cosmology
         self.initialize_cosmology()
         self.star_creation_time = star_creation_time
+
+    @property
+    def gas_mass(self):
+        if self._finalized:
+            my_chemistry = self.fc.chemistry_data
+            mass_units = my_chemistry.density_units * my_chemistry.length_units**3
+            return self.arr(self._gas_mass * mass_units, "g")
+        return self._gas_mass
 
     def prepare_event_times(self, fields):
         """
@@ -673,9 +684,17 @@ class MinihaloModel(FreeFallModel):
         if self.data is None:
             factor = 1
         else:
-            factor= (self.data["density"][0] /
-                     self.get_current_field("density"))**(1/3)
-        return self.initial_radius * factor
+            if self._finalized:
+                rho_now = self.data["density"][-1]
+            else:
+                rho_now = self.get_current_field("density")
+            factor = (self.data["density"][0] / rho_now)**(1/3)
+        radius = self.initial_radius * factor
+
+        if self._finalized:
+            return self.arr(radius * self.fc.chemistry_data.length_units, "cm")
+
+        return radius
 
     def calculate_hydrostatic_dp_parcel(self, itime):
         my_chemistry = self.fc.chemistry_data
@@ -899,7 +918,6 @@ class MinihaloModel1D(MinihaloModel):
         m_BE = self.calculate_bonnor_ebert_mass()
         ratio = self.gas_mass / m_BE
         index = ratio.argmax()
-        index = 0
 
         cmass = self.gas_mass[index] * my_chemistry.density_units * \
           my_chemistry.length_units**3 / mass_sun_cgs
