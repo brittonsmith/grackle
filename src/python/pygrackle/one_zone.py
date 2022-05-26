@@ -752,8 +752,10 @@ class MinihaloModel(FreeFallModel):
         else:
             # Assume gas density is at cosmic baryon fraction at the virial radius.
             # At late times, this is roughly true.
+            rhoc = self.get_current_field("density") * density_units
             rho_dm = edata["dark_matter"][itime][r_used] * density_units
             f_gas = self.cosmology.omega_baryon / self.cosmology.omega_matter
+            rc = self.current_radius * length_units
             g1 = np.log(rhoc[-1])
             g2 = np.log(rho_dm[-1] * f_gas)
             r1 = np.log(rc[-1])
@@ -763,6 +765,7 @@ class MinihaloModel(FreeFallModel):
             rho_gas = np.exp(slope * (lr - r1) + g1)
 
             volume = (4 * np.pi / 3) * (rbins[r_used+1]**3 - rbins[r_used]**3)
+            m_gasc = self.gas_mass * mass_units
             m_gas = (rho_gas * volume).cumsum() + m_gasc[-1]
 
         dpc = self.calculate_hydrostatic_dp_parcel(itime)
@@ -945,7 +948,7 @@ class MinihaloModel1D(MinihaloModel):
 
         used = np.where(edata["used_bins"][itime])[0]
 
-        rhoc = self.data["density"][-1] * density_units
+        rhoc = self.get_current_field("density") * density_units
         rc = self.current_radius * length_units
         m_gasc = self.gas_mass * mass_units
         drc = np.gradient(m_gasc) / (4 * np.pi * rhoc * rc**2)
