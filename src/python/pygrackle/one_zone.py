@@ -829,7 +829,8 @@ class MinihaloModel(FreeFallModel):
             mu1 = self.data["mean_molecular_weight"][-1][prdom]
             P2 = np.max(np.vstack([np.asarray(pressure)[prdom],
                                    hydrostatic_pressure[prdom]]), axis=0)
-            P2 = (P1 + P2) / 2
+            w = 0.9
+            P2 = w * P1 + (1-w) * P2
             fc.calculate_temperature()
             T2 = self.get_current_field("temperature")[prdom]
             mu2 = self.get_current_field("mean_molecular_weight")[prdom]
