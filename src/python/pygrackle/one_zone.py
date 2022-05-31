@@ -552,7 +552,7 @@ class MinihaloModel(FreeFallModel):
                  initial_radius=None, gas_mass=None,
                  include_turbulence=True,
                  event_trigger_fields="all", cosmology=None,
-                 star_creation_time=None):
+                 star_creation_time=None, max_density=None):
 
         self.initial_radius = initial_radius
         self._gas_mass = gas_mass
@@ -570,6 +570,7 @@ class MinihaloModel(FreeFallModel):
         self.cosmology = cosmology
         self.initialize_cosmology()
         self.star_creation_time = star_creation_time
+        self.max_density = max_density
 
     @property
     def gas_mass(self):
@@ -667,6 +668,10 @@ class MinihaloModel(FreeFallModel):
     def finished(self):
         if super().finished:
             return True
+
+        if self.max_density is not None:
+            if (self.get_current_field("density", asarray=True) >= self.max_density).all():
+                return True
 
         if self.gas_mass is not None:
             m_BE = self.calculate_bonnor_ebert_mass()
@@ -837,6 +842,12 @@ class MinihaloModel(FreeFallModel):
             factor[prdom] = (P2 * T1 * mu2) / (T2 * mu1 * P1)
 
             e_factor[prdom] = factor[prdom]
+
+        if self.max_density is not None:
+            density = self.get_current_field("density", asarray=True)
+            ceiling = density * factor >= self.max_density
+            factor[ceiling] = (self.max_density / density)[ceiling]
+            e_factor[ceiling] = factor[ceiling]
 
         self.scale_density_fields(factor)
 
