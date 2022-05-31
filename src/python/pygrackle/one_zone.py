@@ -97,7 +97,7 @@ class OneZoneModel(abc.ABC):
         fc.calculate_cooling_time()
         fc.chemistry_data.cmb_temperature_floor = cmb
 
-    def get_current_field(self, field, copy=False):
+    def get_current_field(self, field, copy=False, asarray=False):
         """
         Return current field values, i.e., from the fluid container.
         """
@@ -117,6 +117,8 @@ class OneZoneModel(abc.ABC):
 
         data = fc[field]
         if size == 1:
+            if asarray:
+                return data.copy()
             return data[0]
         if copy:
             return data.copy()
@@ -716,11 +718,9 @@ class MinihaloModel(FreeFallModel):
         mc = self.gas_mass * mass_units
 
         m_dm_all = edata["dark_matter_mass_enclosed"][itime] * mass_units
+        radius = edata["radius"] * length_units
         rbins = edata["radial_bins"] * length_units
-        slope = np.log(m_dm_all[used[0]] / m_dm_all[iinner]) / \
-          np.log(rbins[used[0]] / rbins[iinner])
-        m_dmc = np.exp(slope * np.log(rc / rbins[iinner]) +
-                       np.log(m_dm_all[iinner]))
+        m_dmc = my_interp(radius, m_dm_all, rc)
 
         drc = rbins[used[0]] - rc
         m_totc = mc + m_dmc
@@ -752,10 +752,10 @@ class MinihaloModel(FreeFallModel):
         else:
             # Assume gas density is at cosmic baryon fraction at the virial radius.
             # At late times, this is roughly true.
-            rhoc = self.get_current_field("density") * density_units
+            rhoc = self.get_current_field("density", asarray=True) * density_units
             rho_dm = edata["dark_matter"][itime][r_used] * density_units
             f_gas = self.cosmology.omega_baryon / self.cosmology.omega_matter
-            rc = self.current_radius * length_units
+            rc = np.ones(self.fc.n_vals) * self.current_radius * length_units
             g1 = np.log(rhoc[-1])
             g2 = np.log(rho_dm[-1] * f_gas)
             r1 = np.log(rc[-1])
@@ -765,7 +765,7 @@ class MinihaloModel(FreeFallModel):
             rho_gas = np.exp(slope * (lr - r1) + g1)
 
             volume = (4 * np.pi / 3) * (rbins[r_used+1]**3 - rbins[r_used]**3)
-            m_gasc = self.gas_mass * mass_units
+            m_gasc = np.ones(self.fc.n_vals) * self.gas_mass * mass_units
             m_gas = (rho_gas * volume).cumsum() + m_gasc[-1]
 
         dpc = self.calculate_hydrostatic_dp_parcel(itime)
@@ -909,9 +909,6 @@ class MinihaloModel(FreeFallModel):
             val = getattr(self, f"calculate_{field}")()
             self.data[field].append(val)
 
-class MinihaloModel1D(MinihaloModel):
-    name = "minihalo1d"
-
     def print_status(self):
         if not self.verbose:
             return
@@ -920,10 +917,11 @@ class MinihaloModel1D(MinihaloModel):
         my_chemistry = fc.chemistry_data
 
         m_BE = self.calculate_bonnor_ebert_mass()
-        ratio = self.gas_mass / m_BE
+        ratio = np.ones(self.fc.n_vals) * self.gas_mass / m_BE
         index = ratio.argmax()
+        gas_mass = (np.ones(self.fc.n_vals) * self.gas_mass)[index]
 
-        cmass = self.gas_mass[index] * my_chemistry.density_units * \
+        cmass = gas_mass * my_chemistry.density_units * \
           my_chemistry.length_units**3 / mass_sun_cgs
         ctime = self.current_time * my_chemistry.time_units / sec_per_year / 1e6
         cdensity = fc["density"][index] * my_chemistry.density_units
@@ -933,6 +931,9 @@ class MinihaloModel1D(MinihaloModel):
           f"m: {cmass:8g} Msun, " + \
           f"rho: {cdensity:8g} g/cm^3, T: {ctemperature:8g} K, M/M_BE: {ratio[index]:8g}"
         print (status, flush=True)
+
+class MinihaloModel1D(MinihaloModel):
+    name = "minihalo1d"
 
     def calculate_hydrostatic_dp_parcel(self, itime):
         """
@@ -970,3 +971,31 @@ class MinihaloModel1D(MinihaloModel):
         dpc = G * m_totc * rhoc * drc / rc**2
 
         return dpc
+
+def clip_log(x, a_min=1e-100, a_max=np.inf):
+    return np.log(np.clip(x, a_min=a_min, a_max=a_max))
+
+def my_interp(xd, yd, xp, logx=True, logy=True, **ikwargs):
+    if logx:
+        my_x = clip_log(xd)
+    else:
+        my_x = xd
+
+    if logy:
+        my_y = clip_log(yd)
+    else:
+        my_y = yd
+
+    if logx:
+        my_xp = clip_log(xp)
+    else:
+        my_xp = xp
+
+    if not ikwargs:
+        ikwargs = {"kind": "linear", "fill_value": "extrapolate"}
+    f1 = interp1d(my_x, my_y, **ikwargs)
+
+    my_yp = f1(my_xp)
+    if logy:
+        my_yp = np.exp(my_yp)
+    return my_yp
