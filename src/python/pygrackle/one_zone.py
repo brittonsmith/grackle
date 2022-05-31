@@ -916,12 +916,15 @@ class MinihaloModel(FreeFallModel):
         fc = self.fc
         my_chemistry = fc.chemistry_data
 
-        m_BE = self.calculate_bonnor_ebert_mass()
-        ratio = np.ones(self.fc.n_vals) * self.gas_mass / m_BE
-        index = ratio.argmax()
-        gas_mass = (np.ones(self.fc.n_vals) * self.gas_mass)[index]
+        gas_mass = self.gas_mass
+        if self.fc.n_vals == 1:
+            gas_mass = np.ones(1) * gas_mass
 
-        cmass = gas_mass * my_chemistry.density_units * \
+        m_BE = self.calculate_bonnor_ebert_mass()
+        ratio = gas_mass / m_BE
+        index = ratio.argmax()
+
+        cmass = gas_mass[index] * my_chemistry.density_units * \
           my_chemistry.length_units**3 / mass_sun_cgs
         ctime = self.current_time * my_chemistry.time_units / sec_per_year / 1e6
         cdensity = fc["density"][index] * my_chemistry.density_units
