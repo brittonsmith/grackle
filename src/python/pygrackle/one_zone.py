@@ -12,6 +12,7 @@ from scipy.interpolate import interp1d
 from unyt import unyt_array, unyt_quantity
 from unyt.unit_registry import UnitRegistry
 
+from pygrackle import FluidContainer
 from pygrackle.utilities.physical_constants import \
     gravitational_constant_cgs, \
     sec_per_year, \
@@ -58,6 +59,7 @@ class OneZoneModel(abc.ABC):
 
         self.check_stopping_criteria()
         self.prepare_event_times(event_trigger_fields)
+        self.active = np.ones(self.fc.n_vals, dtype=bool)
 
     def prepare_event_times(self, fields):
         """
@@ -320,6 +322,11 @@ class OneZoneModel(abc.ABC):
     def before_solve_chemistry(self):
         pass
 
+    def solve_chemistry(self, dt, fc=None):
+        if fc is None:
+            fc = self.fc
+        fc.solve_chemistry(dt)
+
     def evolve(self):
         if self.data is None:
             self.current_time = 0
@@ -336,7 +343,7 @@ class OneZoneModel(abc.ABC):
 
             dt = self.calculate_timestep()
 
-            self.fc.solve_chemistry(dt)
+            self.solve_chemistry(dt)
 
             self.current_time += dt
 
@@ -458,12 +465,13 @@ class FreeFallModel(OneZoneModel):
     def calculate_timestep(self):
         fc = self.fc
         dt_ff = self.safety_factor / self.freefall_constant / \
-          np.sqrt(self.get_current_field("density"))
+          np.sqrt(self.get_current_field("density", asarray=True))
 
         dt_cool = self.safety_factor * \
-          np.abs(self.get_current_field("cooling_time"))
+          np.abs(self.get_current_field("cooling_time", asarray=True))
 
-        dt = min(np.min(dt_ff), np.min(dt_cool))
+        active = self.active
+        dt = min(np.min(dt_ff[active]), np.min(dt_cool[active]))
         dt = min(dt, self.remaining_time)
         self.dt = dt
         return dt
@@ -538,6 +546,7 @@ class FreeFallModel(OneZoneModel):
             force_factor[f2] = 1.0 + 0.2 * X - 2.9 * X**2
 
         np.clip(force_factor, a_min=0, a_max=0.95, out=force_factor)
+        print (force_factor, flush=True)
 
 class MinihaloModel(FreeFallModel):
     name = "minihalo"
@@ -849,11 +858,25 @@ class MinihaloModel(FreeFallModel):
             factor[ceiling] = (self.max_density / density)[ceiling]
             e_factor[ceiling] = factor[ceiling]
 
+        inactive = ~self.active
+        factor[inactive] = 1
+        e_factor[inactive] = 1
+
         self.scale_density_fields(factor)
 
         de = - pressure * (1 - e_factor) / \
           (e_factor * self.get_current_field("density"))
-        fc["energy"][:] += de
+        fc["energy"] += de
+
+        self.update_active()
+
+    def update_active(self):
+        if self.max_density is None:
+            return
+
+        density = self.get_current_field("density", asarray=True)
+        ceiling = density < self.max_density
+        self.active &= ceiling
 
     def calculate_sound_speed(self):
         fc = self.fc
@@ -948,6 +971,35 @@ class MinihaloModel(FreeFallModel):
 
 class MinihaloModel1D(MinihaloModel):
     name = "minihalo1d"
+
+    def solve_chemistry(self, dt):
+        active = self.active
+        n_active = active.sum()
+        if self.fc.n_vals == n_active:
+            super().solve_chemistry(dt)
+            return
+
+        mini_fc = self.mini_fc
+        if n_active != mini_fc.n_vals:
+            mini_fc.n_vals = n_active
+            for field in mini_fc.fields:
+                mini_fc._setup_fluid(field)
+
+        for field in mini_fc.fields:
+            mini_fc[field][:] = self.fc[field][active]
+
+        super().solve_chemistry(dt, fc=mini_fc)
+
+        for field in mini_fc.fields:
+            self.fc[field][active] = mini_fc[field][:]
+
+    _mini_fc = None
+    @property
+    def mini_fc(self):
+        if self._mini_fc is None:
+            n_vals = self.active.sum()
+            self._mini_fc = FluidContainer(self.fc.chemistry_data, n_vals)
+        return self._mini_fc
 
     def calculate_hydrostatic_dp_parcel(self, itime):
         """
