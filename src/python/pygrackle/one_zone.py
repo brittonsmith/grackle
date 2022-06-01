@@ -943,12 +943,15 @@ class MinihaloModel(FreeFallModel):
             val = getattr(self, f"calculate_{field}")()
             self.data[field].append(val)
 
+    _last_update = None
     def print_status(self):
         if not self.verbose:
             return
 
         fc = self.fc
         my_chemistry = fc.chemistry_data
+
+        ufields = ["index", "density", "time", "be_ratio"]
 
         gas_mass = self.gas_mass
         if self.size == 1:
@@ -958,15 +961,42 @@ class MinihaloModel(FreeFallModel):
         ratio = gas_mass / m_BE
         index = ratio.argmax()
 
+        cratio = ratio[index]
         cmass = gas_mass[index] * my_chemistry.density_units * \
           my_chemistry.length_units**3 / mass_sun_cgs
         ctime = self.current_time * my_chemistry.time_units / sec_per_year / 1e6
         cdensity = fc["density"][index] * my_chemistry.density_units
         ctemperature = fc["temperature"][index]
 
+        update = False
+        last = self._last_update
+        if self.verbose != 2:
+            update = True
+        elif last is None:
+            update = True
+        elif self.finished:
+            update = True
+        elif index != last["index"]:
+            update = True
+        elif ctime - last["time"] >= 1:
+            update = True
+        elif cratio > .9 and cratio - last["be_ratio"] > .01:
+            update = True
+        elif np.log10(cratio / last["be_ratio"]) > 0.1:
+            update = True
+        elif cdensity / last["density"] >= 10:
+            update = True
+
+        if not update:
+            return
+
+        self._last_update = \
+          {"index": index, "time": ctime,
+           "density": cdensity, "be_ratio": cratio}
+
         status = f"Evolve {self.name} - t: {ctime:8g} Myr, " + \
           f"m: {cmass:8g} Msun, " + \
-          f"rho: {cdensity:8g} g/cm^3, T: {ctemperature:8g} K, M/M_BE: {ratio[index]:8g}"
+          f"rho: {cdensity:8g} g/cm^3, T: {ctemperature:8g} K, M/M_BE: {cratio:8g}"
         print (status, flush=True)
 
 class MinihaloModel1D(MinihaloModel):
