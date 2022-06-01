@@ -545,7 +545,6 @@ class FreeFallModel(OneZoneModel):
             force_factor[f2] = 1.0 + 0.2 * X - 2.9 * X**2
 
         np.clip(force_factor, a_min=0, a_max=0.95, out=force_factor)
-        print (force_factor, flush=True)
 
 class MinihaloModel(FreeFallModel):
     name = "minihalo"
@@ -812,6 +811,7 @@ class MinihaloModel(FreeFallModel):
         tff = self.calculate_freefall_time()
 
         pressure = self.get_current_field("pressure", copy=True)
+        density = self.get_current_field("density", copy=True)
 
         freefall = tff < tcs
         factor = np.ones(self.size)
@@ -822,15 +822,12 @@ class MinihaloModel(FreeFallModel):
             self.calculate_collapse_factor()
             force_factor = self.get_current_field("force_factor")[freefall]
 
-            total_density = self.get_current_field("density", copy=True)[freefall]
+            total_density = density.copy()[freefall]
             if self.use_dark_matter:
                 total_density += self.get_current_fields("dark_matter")[freefall]
 
             val = self.freefall_constant * np.sqrt(total_density) * self.dt
             factor[freefall] = np.sqrt(1 - force_factor) * val + 1
-
-            # update energy assuming un-altered free-fall collapse
-            e_factor[freefall] = val + 1
 
         # pressure-dominated
         prdom = ~freefall
@@ -849,22 +846,26 @@ class MinihaloModel(FreeFallModel):
             mu2 = self.get_current_field("mean_molecular_weight")[prdom]
             factor[prdom] = (P2 * T1 * mu2) / (T2 * mu1 * P1)
 
-            e_factor[prdom] = factor[prdom]
+        # Preserve monotonicity in density profile.
+        new_density = density * factor
+        if (np.diff(new_density) > 0).any():
+            for i in range(new_density.size-1, -1, -1):
+                new_density[:i] = np.clip(new_density[:i],
+                                          a_min=new_density[i], a_max=np.inf)
+            factor = new_density / density
 
         if self.max_density is not None:
             density = self.get_current_field("density", asarray=True)
             ceiling = density * factor >= self.max_density
             factor[ceiling] = (self.max_density / density)[ceiling]
-            e_factor[ceiling] = factor[ceiling]
 
         inactive = ~self.active
         factor[inactive] = 1
-        e_factor[inactive] = 1
 
         self.scale_density_fields(factor)
 
-        de = - pressure * (1 - e_factor) / \
-          (e_factor * self.get_current_field("density"))
+        de = - pressure * (1 - factor) / \
+          (factor * self.get_current_field("density"))
         fc["energy"] += de
 
         self.update_active()
