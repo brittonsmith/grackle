@@ -59,7 +59,8 @@ class OneZoneModel(abc.ABC):
 
         self.check_stopping_criteria()
         self.prepare_event_times(event_trigger_fields)
-        self.active = np.ones(self.fc.n_vals, dtype=bool)
+        self.size = self.fc.n_vals
+        self.active = np.ones(self.size, dtype=bool)
 
     def prepare_event_times(self, fields):
         """
@@ -322,10 +323,8 @@ class OneZoneModel(abc.ABC):
     def before_solve_chemistry(self):
         pass
 
-    def solve_chemistry(self, dt, fc=None):
-        if fc is None:
-            fc = self.fc
-        fc.solve_chemistry(dt)
+    def solve_chemistry(self, dt):
+        self.fc.solve_chemistry(dt)
 
     def evolve(self):
         if self.data is None:
@@ -503,7 +502,7 @@ class FreeFallModel(OneZoneModel):
         """
 
         data = self.data
-        force_factor = np.zeros(self.fc.n_vals)
+        force_factor = np.zeros(self.size)
         self.fc["force_factor"] = force_factor
 
         if not self.include_pressure:
@@ -528,7 +527,7 @@ class FreeFallModel(OneZoneModel):
             gamma_eff += 0.5 * ((np.log10(pressure[-2] / pressure[-3]) /
                                  np.log10(density[-2] / density[-3])) - gamma_eff)
 
-        if self.fc.n_vals == 1:
+        if self.size == 1:
             gamma_eff = np.asarray(gamma_eff)
         np.clip(gamma_eff, a_min=-np.inf, a_max=4/3, out=gamma_eff)
 
@@ -769,7 +768,7 @@ class MinihaloModel(FreeFallModel):
             rhoc = self.get_current_field("density", asarray=True) * density_units
             rho_dm = edata["dark_matter"][itime][r_used] * density_units
             f_gas = self.cosmology.omega_baryon / self.cosmology.omega_matter
-            rc = np.ones(self.fc.n_vals) * self.current_radius * length_units
+            rc = np.ones(self.size) * self.current_radius * length_units
             g1 = np.log(rhoc[-1])
             g2 = np.log(rho_dm[-1] * f_gas)
             r1 = np.log(rc[-1])
@@ -779,7 +778,7 @@ class MinihaloModel(FreeFallModel):
             rho_gas = np.exp(slope * (lr - r1) + g1)
 
             volume = (4 * np.pi / 3) * (rbins[r_used+1]**3 - rbins[r_used]**3)
-            m_gasc = np.ones(self.fc.n_vals) * self.gas_mass * mass_units
+            m_gasc = np.ones(self.size) * self.gas_mass * mass_units
             m_gas = (rho_gas * volume).cumsum() + m_gasc[-1]
 
         dpc = self.calculate_hydrostatic_dp_parcel(itime)
@@ -788,7 +787,7 @@ class MinihaloModel(FreeFallModel):
         dpp = gravitational_constant_cgs * m_tot * rho_gas * dr / r**2
         dp = np.hstack([dpc, dpp])
 
-        p_cgs = np.flip(np.flip(dp).cumsum())[:self.fc.n_vals]
+        p_cgs = np.flip(np.flip(dp).cumsum())[:self.size]
         return p_cgs / my_chemistry.pressure_units
 
     def calculate_hydrostatic_pressure(self):
@@ -815,8 +814,8 @@ class MinihaloModel(FreeFallModel):
         pressure = self.get_current_field("pressure", copy=True)
 
         freefall = tff < tcs
-        factor = np.ones(self.fc.n_vals)
-        e_factor = np.ones(self.fc.n_vals)
+        factor = np.ones(self.size)
+        e_factor = np.ones(self.size)
 
         # free-fall
         if freefall.any():
@@ -951,7 +950,7 @@ class MinihaloModel(FreeFallModel):
         my_chemistry = fc.chemistry_data
 
         gas_mass = self.gas_mass
-        if self.fc.n_vals == 1:
+        if self.size == 1:
             gas_mass = np.ones(1) * gas_mass
 
         m_BE = self.calculate_bonnor_ebert_mass()
@@ -974,32 +973,27 @@ class MinihaloModel1D(MinihaloModel):
 
     def solve_chemistry(self, dt):
         active = self.active
-        n_active = active.sum()
-        if self.fc.n_vals == n_active:
+        active_size = active.sum()
+        if self.size == active_size:
             super().solve_chemistry(dt)
             return
 
-        mini_fc = self.mini_fc
-        if n_active != mini_fc.n_vals:
-            mini_fc.n_vals = n_active
-            for field in mini_fc.fields:
-                mini_fc._setup_fluid(field)
+        fc = self.fc
+        field_store = {field: self.fc[field] for field in fc.fields}
 
-        for field in mini_fc.fields:
-            mini_fc[field][:] = self.fc[field][active]
+        fc.n_vals = active_size
+        for field in fc.fields:
+            fc._setup_fluid(field)
+            fc[field][:] = field_store[field][active]
 
-        super().solve_chemistry(dt, fc=mini_fc)
+        super().solve_chemistry(dt)
 
-        for field in mini_fc.fields:
-            self.fc[field][active] = mini_fc[field][:]
+        for field in fc.fields:
+            field_store[field][active] = fc[field][:]
 
-    _mini_fc = None
-    @property
-    def mini_fc(self):
-        if self._mini_fc is None:
-            n_vals = self.active.sum()
-            self._mini_fc = FluidContainer(self.fc.chemistry_data, n_vals)
-        return self._mini_fc
+        fc.n_vals = self.size
+        for field in fc.fields:
+            fc[field] = field_store[field]
 
     def calculate_hydrostatic_dp_parcel(self, itime):
         """
