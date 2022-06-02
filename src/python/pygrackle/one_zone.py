@@ -521,8 +521,9 @@ class FreeFallModel(OneZoneModel):
         dlp = np.gradient(lp, axis=0, edge_order=edge_order)[-1]
         dld = np.gradient(ld, axis=0, edge_order=edge_order)[-1]
         nzd = dld != 0
-        gamma_eff = np.zeros(self.size)
-        gamma_eff[nzd] = dlp[nzd] / dld[nzd]
+        gamma_eff = np.full(self.size, 4/3)
+        if nzd.any():
+            gamma_eff[nzd] = dlp[nzd] / dld[nzd]
         np.clip(gamma_eff, a_min=-np.inf, a_max=4/3, out=gamma_eff)
 
         # Equation 9 of Omukai et al. (2005)
@@ -538,7 +539,7 @@ class FreeFallModel(OneZoneModel):
             X = gamma_eff[f2] - 4/3
             force_factor[f2] = 1.0 + 0.2 * X - 2.9 * X**2
 
-        np.clip(force_factor, a_min=0, a_max=0.95, out=force_factor)
+        np.clip(force_factor, a_min=0, a_max=1, out=force_factor)
 
 class MinihaloModel(FreeFallModel):
     name = "minihalo"
@@ -823,10 +824,19 @@ class MinihaloModel(FreeFallModel):
             val = self.freefall_constant * np.sqrt(total_density) * self.dt
             factor[freefall] = np.sqrt(1 - force_factor) * val + 1
 
+            stalled = force_factor == 1
+            if stalled.any():
+                if self.size == 1:
+                    freefall = ~freefall
+                else:
+                    iff = np.where(freefall)[0]
+                    freefall[iff[stalled]] = False
+
         # pressure-dominated
         prdom = ~freefall
         if (prdom).any():
-            hydrostatic_pressure = self.calculate_hydrostatic_pressure()
+            # hydrostatic_pressure = self.calculate_hydrostatic_pressure()
+            hydrostatic_pressure = self.data["hydrostatic_pressure"][-1]
 
             P1 = self.data["pressure"][-1][prdom]
             T1 = self.data["temperature"][-1][prdom]
