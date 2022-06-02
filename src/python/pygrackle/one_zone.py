@@ -509,26 +509,20 @@ class FreeFallModel(OneZoneModel):
             return
 
         # Calculate the effective adiabatic index, dlog(p)/dlog(rho).
-        density = data["density"]
-        pressure = data["pressure"]
-
-        if len(pressure) < 3:
+        npast = len(data["pressure"])
+        if npast < 2:
             return
 
-        density = np.array(density[-3:])
-        pressure = np.array(pressure[-3:])
+        last = min(npast, 3)
+        lp = np.log(data["pressure"][-last:])
+        ld = np.log(data["density"][-last:])
 
-        # compute dlog(p) / dlog(rho) using last two timesteps
-        gamma_eff = np.log10(pressure[-1] / pressure[-2]) / \
-            np.log10(density[-1] / density[-2])
-
-        # compute a higher order derivative if more than two points available
-        if len(pressure) > 2:
-            gamma_eff += 0.5 * ((np.log10(pressure[-2] / pressure[-3]) /
-                                 np.log10(density[-2] / density[-3])) - gamma_eff)
-
-        if self.size == 1:
-            gamma_eff = np.asarray(gamma_eff)
+        edge_order = min(last-1, 2)
+        dlp = np.gradient(lp, axis=0, edge_order=edge_order)[-1]
+        dld = np.gradient(ld, axis=0, edge_order=edge_order)[-1]
+        nzd = dld != 0
+        gamma_eff = np.zeros(self.size)
+        gamma_eff[nzd] = dlp[nzd] / dld[nzd]
         np.clip(gamma_eff, a_min=-np.inf, a_max=4/3, out=gamma_eff)
 
         # Equation 9 of Omukai et al. (2005)
