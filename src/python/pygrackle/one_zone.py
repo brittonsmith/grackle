@@ -835,8 +835,8 @@ class MinihaloModel(FreeFallModel):
         # pressure-dominated
         prdom = ~freefall
         if (prdom).any():
-            # hydrostatic_pressure = self.calculate_hydrostatic_pressure()
-            hydrostatic_pressure = self.data["hydrostatic_pressure"][-1]
+            hydrostatic_pressure = self.calculate_hydrostatic_pressure()
+            # hydrostatic_pressure = self.data["hydrostatic_pressure"][-1]
 
             P1 = self.data["pressure"][-1][prdom]
             T1 = self.data["temperature"][-1][prdom]
