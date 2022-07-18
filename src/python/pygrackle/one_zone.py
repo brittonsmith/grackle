@@ -620,9 +620,12 @@ class MinihaloModel(FreeFallModel):
         if itime < 0 or itime >= time.size - 1:
             return
 
-        u1 = edata["used_bins"][itime]
+        ilow = self.get_lower_time_bin(self.current_time)
+        ihigh = self.get_upper_time_bin(self.current_time)
+
+        u1 = edata["used_bins"][ilow]
         x1 = np.log(edata["radius"][u1])
-        u2 = edata["used_bins"][itime+1]
+        u2 = edata["used_bins"][ihigh]
         x2 = np.log(edata["radius"][u2])
         xp = np.log(self.current_radius)
 
@@ -632,18 +635,18 @@ class MinihaloModel(FreeFallModel):
         for field in self.external_fields:
             fdata = edata[field]
 
-            y1 = np.log(np.clip(edata[field][itime, u1],
+            y1 = np.log(np.clip(edata[field][ilow, u1],
                                 a_min=1e-50, a_max=np.inf))
             f1 = interp1d(x1, y1, **ikwargs)
             v1 = f1(xp)
 
-            y2 = np.log(np.clip(edata[field][itime+1, u2],
+            y2 = np.log(np.clip(edata[field][ihigh, u2],
                                 a_min=1e-50, a_max=np.inf))
             f2 = interp1d(x2, y2, **ikwargs)
             v2 = f2(xp)
 
-            slope = (v2 - v1) / (time[itime+1] - time[itime])
-            new_fields[field] = np.exp(slope * (self.current_time - time[itime]) + v1)
+            slope = (v2 - v1) / (time[ihigh] - time[ilow])
+            new_fields[field] = np.exp(slope * (self.current_time - time[ilow]) + v1)
 
         for field in new_fields:
             self.fc[field][:] = new_fields[field]
@@ -789,15 +792,56 @@ class MinihaloModel(FreeFallModel):
         p_cgs = np.flip(np.flip(dp).cumsum())[:self.size]
         return p_cgs / my_chemistry.pressure_units
 
-    def calculate_hydrostatic_pressure(self):
+    def get_lower_time_bin(self, time, within=5):
         edata = self.external_data
         time = edata["time"]
         itime = np.digitize(self.current_time, time) - 1
 
-        p1 = np.log(self.calculate_hydrostatic_pressure_profile(itime))
-        p2 = np.log(self.calculate_hydrostatic_pressure_profile(itime+1))
-        t1 = time[itime]
-        t2 = time[itime+1]
+        if itime <= 0:
+            return 0
+
+        ilow = itime
+        while itime - ilow < within:
+            used = np.where(edata["used_bins"][ilow])[0]
+            if used.size > 1:
+                return ilow
+            ilow -= 1
+
+        raise RuntimeError(
+            f"Cannot find lower time bin within {within} bins "
+            f"of t = {time} ({itime}).")
+
+    def get_upper_time_bin(self, time, within=5):
+        edata = self.external_data
+        time = edata["time"]
+        itime = np.digitize(self.current_time, time) - 1
+
+        if itime >= time.size - 1:
+            return itime.size - 1
+
+        ihigh = itime + 1
+        while ihigh - itime + 1 < within:
+            used = np.where(edata["used_bins"][ihigh])[0]
+            if used.size > 1:
+                return ihigh
+            ihigh += 1
+
+        raise RuntimeError(
+            f"Cannot find upper time bin within {within} bins "
+            f"of t = {time} ({itime}).")
+
+    def calculate_hydrostatic_pressure(self):
+        edata = self.external_data
+        time = edata["time"]
+
+        ilow = self.get_lower_time_bin(self.current_time)
+        p1 = np.log(self.calculate_hydrostatic_pressure_profile(ilow))
+
+        ihigh = self.get_upper_time_bin(self.current_time)
+        p2 = np.log(self.calculate_hydrostatic_pressure_profile(ihigh))
+
+        t1 = time[ilow]
+        t2 = time[ihigh]
         slope = (p2 - p1) / (t2 - t1)
         p = np.exp(slope * (self.current_time - t1) + p1)
 
