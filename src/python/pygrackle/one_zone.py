@@ -369,6 +369,7 @@ class CoolingModel(OneZoneModel):
 
         if self.final_time is not None and \
           self.current_time >= self.final_time:
+            print ("Final time reached.")
             return True
 
         return False
@@ -453,10 +454,12 @@ class FreeFallModel(OneZoneModel):
     def finished(self):
         if self.final_density is not None and \
           np.max(self.get_current_field("density")) >= self.final_density:
+            print ("All points at max density.")
             return True
 
         if self.final_time is not None and \
           self.current_time >= self.final_time:
+            print ("Final time reached.")
             return True
 
         return False
@@ -673,11 +676,13 @@ class MinihaloModel(FreeFallModel):
 
         if self.max_density is not None:
             if (self.get_current_field("density", asarray=True) >= self.max_density).all():
+                print ("All points at max density.")
                 return True
 
         if self.gas_mass is not None:
             m_BE = self.calculate_bonnor_ebert_mass()
             if np.max(self.gas_mass / m_BE) >= 1:
+                print ("Bonnor-Ebert instability reached.")
                 return True
 
         return False
@@ -841,8 +846,13 @@ class MinihaloModel(FreeFallModel):
             P1 = self.data["pressure"][-1][prdom]
             T1 = self.data["temperature"][-1][prdom]
             mu1 = self.data["mean_molecular_weight"][-1][prdom]
-            P2 = np.max(np.vstack([np.asarray(pressure)[prdom],
-                                   hydrostatic_pressure[prdom]]), axis=0)
+
+            # Using the hydrostatic pressure alone as P2 gives
+            # much better fit.
+            # P2 = np.max(np.vstack([np.asarray(pressure)[prdom],
+            #                        hydrostatic_pressure[prdom]]), axis=0)
+            P2 = hydrostatic_pressure[prdom]
+
             w = 0.9
             P2 = w * P1 + (1-w) * P2
             fc.calculate_temperature()
