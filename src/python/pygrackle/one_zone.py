@@ -804,12 +804,16 @@ class MinihaloModel(FreeFallModel):
         while itime - ilow < within:
             used = np.where(edata["used_bins"][ilow])[0]
             if used.size > 1:
-                return ilow
+                iradius = np.digitize(self.current_radius, edata["radial_bins"])
+                r_used = used[used >= iradius.max()]
+                if r_used.size > 0:
+                    return ilow
+
             ilow -= 1
 
         raise RuntimeError(
             f"Cannot find lower time bin within {within} bins "
-            f"of t = {time} ({itime}).")
+            f"of t = {self.current_time} ({itime}).")
 
     def get_upper_time_bin(self, time, within=5):
         edata = self.external_data
@@ -823,12 +827,16 @@ class MinihaloModel(FreeFallModel):
         while ihigh - itime + 1 < within:
             used = np.where(edata["used_bins"][ihigh])[0]
             if used.size > 1:
-                return ihigh
+                iradius = np.digitize(self.current_radius, edata["radial_bins"])
+                r_used = used[used >= iradius.max()]
+                if r_used.size > 0:
+                    return ihigh
+
             ihigh += 1
 
         raise RuntimeError(
             f"Cannot find upper time bin within {within} bins "
-            f"of t = {time} ({itime}).")
+            f"of t = {self.current_time} ({itime}).")
 
     def calculate_hydrostatic_pressure(self):
         edata = self.external_data
