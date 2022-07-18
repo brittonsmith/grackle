@@ -765,23 +765,47 @@ class MinihaloModel(FreeFallModel):
             rho_gas = edata["gas_density"][itime][r_used] * density_units
 
         else:
-            # Assume gas density is at cosmic baryon fraction at the virial radius.
-            # At late times, this is roughly true.
-            rhoc = self.get_current_field("density", asarray=True) * density_units
-            rho_dm = edata["dark_matter"][itime][r_used] * density_units
+            # After the star has formed, take the gas mass/density profiles
+            # from the last output before the star forms.
+            # Compute the difference in total dark matter mass since
+            # the star formation time and add baryonic mass according to
+            # the cosmic baryon fraction to the outermost mass bin and
+            # adjust the outermost gas density profile bin accordingly.
+            # This is significantly better at preventing a drop in hydrostatic
+            # presure in the period just after the star forms.
+            ict = np.digitize(self.star_creation_time, edata["time"]) - 1
+            used_ct = np.where(edata["used_bins"][ict])[0]
+            r_used_ct = used_ct[used_ct >= iradius.max()]
+            m_dm_ct = edata["dark_matter_mass_enclosed"][ict, r_used_ct] * mass_units
             f_gas = self.cosmology.omega_baryon / self.cosmology.omega_matter
-            rc = np.ones(self.size) * self.current_radius * length_units
-            g1 = np.log(rhoc[-1])
-            g2 = np.log(rho_dm[-1] * f_gas)
-            r1 = np.log(rc[-1])
-            r2 = np.log(rbins[r_used[-1]+1])
-            lr = np.log(r)
-            slope = (g2 - g1) / (r2 - r1)
-            rho_gas = np.exp(slope * (lr - r1) + g1)
+            m_gas_add = f_gas * (m_dm.sum() - m_dm_ct.sum())
 
+            m_gas = edata["gas_mass_enclosed"][ict, r_used] * mass_units
+            m_gas[-1] += m_gas_add
+            rho_gas = edata["gas_density"][ict][r_used] * density_units
             volume = (4 * np.pi / 3) * (rbins[r_used+1]**3 - rbins[r_used]**3)
-            m_gasc = np.ones(self.size) * self.gas_mass * mass_units
-            m_gas = (rho_gas * volume).cumsum() + m_gasc[-1]
+            rho_gas[-1] = (rho_gas[-1] * volume[-1] + m_gas_add) / volume[-1]
+            # Add core gas mass to outer mass profile.
+            m_gas_c = self.gas_mass[-1] * mass_units
+            m_gas += m_gas_c
+
+            # # Assume gas density is at cosmic baryon fraction at the virial radius.
+            # # At late times, this is roughly true.
+            # rhoc = self.get_current_field("density", asarray=True) * density_units
+            # rho_dm = edata["dark_matter"][itime][r_used] * density_units
+            # f_gas = self.cosmology.omega_baryon / self.cosmology.omega_matter
+            # rc = np.ones(self.size) * self.current_radius * length_units
+            # g1 = np.log(rhoc[-1])
+            # g2 = np.log(rho_dm[-1] * f_gas)
+            # r1 = np.log(rc[-1])
+            # r2 = np.log(rbins[r_used[-1]+1])
+            # lr = np.log(r)
+            # slope = (g2 - g1) / (r2 - r1)
+            # rho_gas = np.exp(slope * (lr - r1) + g1)
+
+            # volume = (4 * np.pi / 3) * (rbins[r_used+1]**3 - rbins[r_used]**3)
+            # m_gasc = np.ones(self.size) * self.gas_mass * mass_units
+            # m_gas = (rho_gas * volume).cumsum() + m_gasc[-1]
 
         dpc = self.calculate_hydrostatic_dp_parcel(itime)
         # add pressure from radial bins outside the gas parcels
