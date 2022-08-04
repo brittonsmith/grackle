@@ -18,6 +18,8 @@ from pygrackle.utilities.physical_constants import \
     sec_per_year, \
     mass_sun_cgs
 
+from yt import save_as_dataset
+
 _fc_calc_fields = (
     "cooling_time",
     "dust_temperature",
@@ -35,6 +37,7 @@ class OneZoneModel(abc.ABC):
     name = None
     verbose = True
     stopping_criteria = ()
+    _current_properties = ("time")
     _ignore_external = ("time")
     _cmb_in_cooling_time = False
     _finalized = False
@@ -236,8 +239,6 @@ class OneZoneModel(abc.ABC):
             self.data = defaultdict(list)
         data = self.data
 
-        data["time"].append(self.current_time)
-
         cfields = [
             "cooling_time",
             "gamma",
@@ -257,10 +258,17 @@ class OneZoneModel(abc.ABC):
         for field in all_fields:
             data[field].append(self.get_current_field(field, copy=True))
 
+        for field in self._current_properties:
+            val = getattr(self, f"current_{field}")
+            data[field].append(val)
+
     def finalize_data(self):
         """
         Turn lists of values into array with proper cgs units.
         """
+
+        if self._finalized:
+            return self.data
 
         fc = self.fc
         my_chemistry = fc.chemistry_data
@@ -292,6 +300,10 @@ class OneZoneModel(abc.ABC):
                   self.arr(data[field], "cm/s")
             else:
                 data[field] = np.array(data[field])
+
+        data = {}
+        data.update(self.data)
+        self.data = data
 
         self._finalized = True
         return data
@@ -349,6 +361,12 @@ class OneZoneModel(abc.ABC):
             self.update_quantities()
             self.print_status()
             self.add_to_data()
+
+    def save_as_dataset(self, filename=None):
+        data = self.finalize_data()
+        if filename is None:
+            filename = f"{self.name}.h5"
+        return save_as_dataset(self, filename=filename, data=data)
 
 class CoolingModel(OneZoneModel):
     stopping_criteria = ("final_time", "final_temperature")
@@ -548,7 +566,8 @@ class MinihaloModel(FreeFallModel):
     name = "minihalo"
     stopping_criteria = ("final_time", "final_density", "gas_mass")
     use_dark_matter = False
-    _ignore_external = ("time", "radius", "radial_bins")
+    _current_properties = ("time", "radius")
+    _ignore_external = ("time", "radius", "radial_bins", "gas_mass_enclosed")
 
     def __init__(self, fc, data=None,
                  external_data=None, unit_registry=None,
@@ -576,6 +595,12 @@ class MinihaloModel(FreeFallModel):
         self.initialize_cosmology()
         self.star_creation_time = star_creation_time
         self.max_density = max_density
+
+    def finalize_data(self):
+        super().finalize_data()
+        if "gas_mass" not in self.data:
+            self.data["gas_mass"] = self.gas_mass
+        return self.data
 
     @property
     def gas_mass(self):
