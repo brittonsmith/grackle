@@ -387,7 +387,8 @@ class CoolingModel(OneZoneModel):
 
         if self.final_time is not None and \
           self.current_time >= self.final_time:
-            print ("Final time reached.")
+            if self.verbose:
+                print ("Final time reached.")
             return True
 
         return False
@@ -477,7 +478,8 @@ class FreeFallModel(OneZoneModel):
 
         if self.final_time is not None and \
           self.current_time >= self.final_time:
-            print ("Final time reached.")
+            if self.verbose:
+                print ("Final time reached.")
             return True
 
         return False
@@ -710,7 +712,8 @@ class MinihaloModel(FreeFallModel):
         if self.gas_mass is not None:
             m_BE = self.calculate_bonnor_ebert_mass()
             if np.max(self.gas_mass / m_BE) >= 1:
-                print ("Bonnor-Ebert instability reached.")
+                if self.verbose:
+                    print ("Bonnor-Ebert instability reached.")
                 return True
 
         return False
