@@ -806,7 +806,7 @@ class MinihaloModel(FreeFallModel):
             r_used_ct = used_ct[used_ct >= iradius.max()]
             m_dm_ct = edata["dark_matter_mass_enclosed"][ict, r_used_ct] * mass_units
             f_gas = self.cosmology.omega_baryon / self.cosmology.omega_matter
-            m_gas_add = f_gas * (m_dm.sum() - m_dm_ct.sum())
+            m_gas_add = f_gas * (m_dm[-1] - m_dm_ct[-1])
 
             m_gas = edata["gas_mass_enclosed"][ict, r_used] * mass_units
             m_gas[-1] += m_gas_add
