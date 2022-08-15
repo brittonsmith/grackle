@@ -997,7 +997,7 @@ class MinihaloModel(FreeFallModel):
         cs = np.sqrt(gamma * pressure / density)
         if self.include_turbulence:
             v_turb = self.data["turbulent_velocity"][-1]
-            cs = np.sqrt(cs**2 + v_turb**2)
+            cs = np.max([v_turb, cs], axis=0)
 
         return cs
 
