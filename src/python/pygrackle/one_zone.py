@@ -566,7 +566,7 @@ class FreeFallModel(OneZoneModel):
 
 class MinihaloModel(FreeFallModel):
     name = "minihalo"
-    stopping_criteria = ("final_time", "final_density", "gas_mass")
+    stopping_criteria = ("final_time", "final_density", "max_temperature", "gas_mass")
     use_dark_matter = False
     _current_properties = ("time", "radius")
     _ignore_external = ("time", "radius", "radial_bins", "gas_mass_enclosed")
@@ -578,7 +578,8 @@ class MinihaloModel(FreeFallModel):
                  initial_radius=None, gas_mass=None,
                  include_turbulence=True,
                  event_trigger_fields="all", cosmology=None,
-                 star_creation_time=None, max_density=None):
+                 star_creation_time=None, max_density=None,
+                 max_temperature=None):
 
         self.initial_radius = initial_radius
         self._gas_mass = gas_mass
@@ -597,6 +598,7 @@ class MinihaloModel(FreeFallModel):
         self.initialize_cosmology()
         self.star_creation_time = star_creation_time
         self.max_density = max_density
+        self.max_temperature = max_temperature
 
     def finalize_data(self):
         super().finalize_data()
@@ -703,6 +705,12 @@ class MinihaloModel(FreeFallModel):
     def finished(self):
         if super().finished:
             return True
+
+        if self.max_temperature is not None:
+            if (self.get_current_field("temperature", asarray=True) >=
+                self.max_temperature).any():
+                print ("Max temperature reached.")
+                return True
 
         if self.max_density is not None:
             if (self.get_current_field("density", asarray=True) >= self.max_density).all():
