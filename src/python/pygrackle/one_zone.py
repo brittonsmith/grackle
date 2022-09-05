@@ -364,9 +364,18 @@ class OneZoneModel(abc.ABC):
 
     def save_as_dataset(self, filename=None):
         data = self.finalize_data()
+
+        extra_attrs = {}
+        for attr in ["absolute_start_time"]:
+            val = getattr(self, attr, None)
+            if val is not None:
+                extra_attrs[attr] = val
+
         if filename is None:
             filename = f"{self.name}.h5"
-        return save_as_dataset(self, filename=filename, data=data)
+
+        return save_as_dataset(self, filename=filename, data=data,
+                               extra_attrs=extra_attrs)
 
 class CoolingModel(OneZoneModel):
     stopping_criteria = ("final_time", "final_temperature")
