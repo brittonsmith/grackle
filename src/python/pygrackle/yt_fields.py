@@ -222,5 +222,5 @@ def add_grackle_fields(ds, parameters=None):
     for field, units in _grackle_fields.items():
         fname = "grackle_%s" % field
         funits = str(ds.quan(1, units).in_cgs().units)
-        ds.add_field(fname, function=_grackle_field,
+        ds.add_field(('gas', fname), function=_grackle_field,
                      sampling_type="cell", units=funits)
