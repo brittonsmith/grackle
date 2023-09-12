@@ -101,6 +101,7 @@ def _data_to_fc(data, size=None, fc=None):
     flatten = len(data['gas', 'density'].shape) > 1
 
     fields = _get_needed_fields(fc.chemistry_data)
+
     for gfield in fields:
         yfield, units = _field_map[gfield]
         fdata = data[yfield].to(units)
@@ -192,15 +193,19 @@ def _total_metal_density(field, data):
         field_data += data[field]
     return field_data
 
-def add_grackle_fields(ds, parameters=None):
-    ds.add_field(('gas', 'total_metal_density'),
-                 function=_total_metal_density,
-                 units='g/cm**3',
-                 sampling_type='cell')
+def add_grackle_fields(ds, parameters=None, force_override=False):
+    if ('gas', 'total_metal_density') not in ds.derived_field_list:
+        ds.add_field(('gas', 'total_metal_density'),
+                     function=_total_metal_density,
+                     units='g/cm**3', sampling_type='cell')
 
     prepare_grackle_data(ds, parameters=parameters)
     for field, units in _grackle_fields.items():
         fname = f"grackle_{field}"
+        if ('gas', fname) in ds.derived_field_list and \
+          not force_override:
+          continue
         funits = str(ds.quan(1, units).in_cgs().units)
         ds.add_field(('gas', fname), function=_grackle_field,
-                     sampling_type="cell", units=funits)
+                     sampling_type="cell", units=funits,
+                     force_override=force_override)
