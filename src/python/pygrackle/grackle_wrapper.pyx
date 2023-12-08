@@ -646,6 +646,18 @@ cdef class chemistry_data:
                         mass_hydrogen_cgs**2) / (tbase1**3 * dbase1)
             return coolunit
 
+    property k_units:
+        def __get__(self):
+            if self.comoving_coordinates:
+                dbase1 = self.density_units * \
+                  (self.a_value * self.a_units)**3
+            else:
+                dbase1 = self.density_units
+
+            kunit = self.a_units**3 * mass_hydrogen_cgs / \
+              (dbase1 * self.time_units)
+            return kunit
+
     property energy_units:
         def __get__(self):
             return self.velocity_units**2
@@ -796,6 +808,24 @@ def calculate_dust_temperature(fc):
     _calculate_helper(fc, "dust_temperature",
                       "local_calculate_dust_temperature",
                       &c_local_calculate_dust_temperature)
+
+ctypedef double (*calc_rate_fn)(double, double, c_chemistry_data*)
+
+cdef double _calculate_rate_helper(object fc, double T, double units,
+                                   calc_rate_fn func) except *:
+    # handle all of the setup before calling the function:
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef c_chemistry_data my_chemistry = chem_data.data.data
+
+    # now actually call the function
+    cdef double rval = func(T, units, &my_chemistry)
+    return rval
+
+def get_k1_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k1_rate)
+    return rval
 
 def get_grackle_version():
     cdef c_grackle_version version_struct = c_get_grackle_version()

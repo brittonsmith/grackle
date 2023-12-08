@@ -19,7 +19,8 @@ from pygrackle.grackle_wrapper import \
     calculate_pressure, \
     calculate_temperature, \
     calculate_dust_temperature, \
-    solve_chemistry
+    solve_chemistry, \
+    get_k1_rate
 
 from pygrackle.utilities.misc import \
     issue_deprecation_warning
@@ -153,3 +154,6 @@ class FluidContainer(dict):
 
     def solve_chemistry(self, dt):
         solve_chemistry(self, dt)
+
+    def k1_rate(self, T):
+        return get_k1_rate(self, T)
