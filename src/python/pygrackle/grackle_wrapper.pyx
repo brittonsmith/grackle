@@ -249,6 +249,11 @@ cdef class chemistry_data:
             cdef double[:] memview = <double[:self.NumberOfTemperatureBins*14]>(<double*> self.rates.k13dd)
             return np.asarray(memview)
 
+    property k1:
+        def __get__(self):
+            cdef double[:] memview = <double[:self.NumberOfTemperatureBins]>(<double*> self.rates.k1)
+            return np.asarray(memview)
+
     property k24:
         def __get__(self):
             return self.rates.k24
