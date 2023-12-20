@@ -827,6 +827,192 @@ def get_k1_rate(fc, T):
     cdef double rval = _calculate_rate_helper(fc, T, kunit, k1_rate)
     return rval
 
+def get_k2_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k2_rate)
+    return rval
+
+def get_k3_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k3_rate)
+    return rval
+
+def get_k4_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k4_rate)
+    return rval
+
+def get_k5_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k5_rate)
+    return rval
+
+def get_k6_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k6_rate)
+    return rval
+
+def get_k7_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k7_rate)
+    return rval
+
+def get_k8_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k8_rate)
+    return rval
+
+def get_k9_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k9_rate)
+    return rval
+
+def get_k10_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k10_rate)
+    return rval
+
+def get_k11_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k11_rate)
+    return rval
+
+def get_k12_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k12_rate)
+    return rval
+
+def get_k13_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k13_rate)
+    return rval
+
+def get_k14_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k14_rate)
+    return rval
+
+def get_k15_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k15_rate)
+    return rval
+
+def get_k16_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k16_rate)
+    return rval
+
+def get_k17_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k17_rate)
+    return rval
+
+def get_k18_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k18_rate)
+    return rval
+
+def get_k19_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k19_rate)
+    return rval
+
+def get_k20_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k20_rate)
+    return rval
+
+def get_k21_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k21_rate)
+    return rval
+
+def get_k22_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k22_rate)
+    return rval
+
+def get_k23_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k23_rate)
+    return rval
+
+def get_k50_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k50_rate)
+    return rval
+
+def get_k51_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k51_rate)
+    return rval
+
+def get_k52_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k52_rate)
+    return rval
+
+def get_k53_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k53_rate)
+    return rval
+
+def get_k54_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k54_rate)
+    return rval
+
+def get_k55_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k55_rate)
+    return rval
+
+def get_k56_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k56_rate)
+    return rval
+
+def get_k57_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k57_rate)
+    return rval
+
+def get_k58_rate(fc, T):
+    cdef chemistry_data chem_data = fc.chemistry_data
+    cdef double kunit = chem_data.k_units
+    cdef double rval = _calculate_rate_helper(fc, T, kunit, k58_rate)
+    return rval
+
 def get_grackle_version():
     cdef c_grackle_version version_struct = c_get_grackle_version()
     # all members of version_struct are string literals (i.e. don't call free)

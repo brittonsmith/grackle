@@ -19,6 +19,9 @@ from .fluid_container import \
 from .grackle_wrapper import \
     chemistry_data
 
+from .rate_container import \
+    RateContainer
+
 from .utilities.convenience import \
     setup_fluid_container
 
